@@ -138,6 +138,8 @@ const TITLES = { inicio: ['Panel principal', 'Agenda, calendario y lo que requie
   actas: ['Fichas y actas', 'Ficha consolidada + acta de entrega y resguardo, por ubicación'], reportes: ['Reportes', 'Cargos, descargos, etiquetas, reclasificación y consolidado'],
   catalogo: ['Catálogo', 'Bloques del catálogo con lo contado y lo que había'], inventario: ['Inventario anterior', 'Qué pasa con cada código del sistema'], config: ['Configuración', 'Datos base, reglas de códigos, responsables y textos del acta'] };
 function go(m) { if (m === 'buscador') { openSearch(); return; } if (m === 'tablero' || m === 'actas') m = m === 'actas' ? 'ubic' : 'inicio'; MOD = MODS[m] ? m : 'inicio'; closeFicha(); LS.set('gmod', MOD); render(); window.scrollTo({ top: 0 }); }
+function temaOscuro(on) { document.body.classList.toggle('dark', on); LS.set('tema', on ? 'oscuro' : 'claro'); const b = $('[data-act="tema"]'); if (b) { b.textContent = on ? '☀️' : '🌙'; b.title = on ? 'Modo claro' : 'Modo oscuro'; } }
+temaOscuro(LS.get('tema', 'claro') === 'oscuro');
 function navMin(on) { document.body.classList.toggle('navmin', on); const t = $('#navTog'); if (t) { t.textContent = on ? '»' : '«'; t.title = on ? 'Mostrar menú (Ctrl+\\)' : 'Ocultar menú (Ctrl+\\)'; } LS.set('navmin', on ? 1 : 0); }
 navMin(!!LS.get('navmin', 0));
 $('#navTog').onclick = () => navMin(!document.body.classList.contains('navmin'));
@@ -145,7 +147,7 @@ document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.ke
 $('#nav').addEventListener('click', e => { const b = e.target.closest('button[data-m]'); if (b) go(b.dataset.m); });
 function header(extra) {
   const [t, s] = TITLES[MOD];
-  return `<div class="top"><div><h1>${t}</h1><div class="sub">${s}</div></div><div class="right">${extra || ''}<button class="btn sm" data-act="search" type="button" title="Buscar (Ctrl+K)">🔎 Buscar <span class="kbd">Ctrl K</span></button><button class="btn sm blocbtn" data-act="bloc" type="button" title="Bloc de notas (Ctrl+Shift+N)">✏ Bloc<em id="blocN"${X.pend ? '' : ' hidden'}>${X.pend || ''}</em></button><span class="sync" id="sync">Sincronizado · ${D && D.now ? dt(D.now).slice(-5) : ''}</span><button class="btn sm" data-act="refresh" type="button">↻</button></div></div>`
+  return `<div class="top"><div><h1>${t}</h1><div class="sub">${s}</div></div><div class="right">${extra || ''}<button class="btn sm" data-act="search" type="button" title="Buscar (Ctrl+K)">🔎 Buscar <span class="kbd">Ctrl K</span></button><button class="btn sm blocbtn" data-act="bloc" type="button" title="Bloc de notas (Ctrl+Shift+N)">✏ Bloc<em id="blocN"${X.pend ? '' : ' hidden'}>${X.pend || ''}</em></button><span class="sync" id="sync">Sincronizado · ${D && D.now ? dt(D.now).slice(-5) : ''}</span><button class="btn sm tema" data-act="tema" type="button" title="${document.body.classList.contains('dark') ? 'Modo claro' : 'Modo oscuro'}">${document.body.classList.contains('dark') ? '☀️' : '🌙'}</button><button class="btn sm" data-act="refresh" type="button">↻</button></div></div>`
     + (!X.hasBase && MOD !== 'config' ? `<div class="banner wa"><b>Faltan los datos base.</b> Importe una vez el Excel v10 (inventario anterior, catálogo y reglas) para que se calculen los códigos.<button class="btn sm dark" data-act="go" data-m="config" type="button">Ir a Configuración → Importar</button></div>` : '')
     + (X.etqChanges.length && ['inicio', 'codigos', 'ubic'].includes(MOD) ? `<div class="banner bad"><b>⚠ ${X.etqChanges.length} código(s) de ubicaciones ya etiquetadas cambiaron</b> por registros agregados o editados después. Revise antes de seguir etiquetando.<button class="btn sm" data-act="etqChanges" type="button">Ver cuáles</button></div>` : '');
 }
@@ -284,7 +286,7 @@ MODS.conteo = {
       <dt>Contado por</dt><dd>${esc(r.U)} · ${esc(dmy(r.fecha))}</dd></dl>`;
     const why = `${r.V ? `<div class="banner ${/^ℹ/.test(r.V) ? 'in' : ALERT_BAD.test(r.V) ? 'bad' : 'wa'}">${esc(r.V)}</div>` : ''}<div class="why"><b>Por qué estos códigos</b><ol>${explain(r, cs).map(w => `<li>${w}</li>`).join('')}</ol></div>`;
     const ft = fotos.length ? `<div class="cfotos">${fotos.map(f => `<figure><img data-fid="${esc(f.id)}" alt="Cargando…"><figcaption>${esc(f.t || f.n || 'Foto')} · <a href="https://drive.google.com/file/d/${esc(f.id)}/view" target="_blank" rel="noopener">abrir en Drive</a></figcaption></figure>`).join('')}</div>` : '<div class="empty">Este registro no tiene fotos.</div>';
-    const cod = cs.length ? `<div class="codes">${cs.map(c => `<span class="${c.R === 'Conservado' ? 'c' : c.R === 'Reciclado' ? 'r' : 'nw'}" title="${esc(c.R + ' · ' + c.F)} · clic: ficha" data-act="cFcod" data-i="${c.n - 1}" style="cursor:pointer">${esc(c.B)}</span>`).join('')}</div><div class="legend" style="margin-top:8px"><span><i style="background:var(--okb)"></i>conservado</span><span><i style="background:var(--inb)"></i>reciclado</span><span><i style="background:#FCE7CF"></i>nuevo</span></div>` : '<div class="empty">Este registro no recibe códigos.</div>';
+    const cod = cs.length ? `<div class="codes">${cs.map(c => `<span class="${c.R === 'Conservado' ? 'c' : c.R === 'Reciclado' ? 'r' : 'nw'}" title="${esc(c.R + ' · ' + c.F)} · clic: ficha" data-act="cFcod" data-i="${c.n - 1}" style="cursor:pointer">${esc(c.B)}</span>`).join('')}</div><div class="legend" style="margin-top:8px"><span><i style="background:var(--okb)"></i>conservado</span><span><i style="background:var(--inb)"></i>reciclado</span><span><i style="background:var(--nwb)"></i>nuevo</span></div>` : '<div class="empty">Este registro no recibe códigos.</div>';
     const body = t === 'datos' ? datos : t === 'fotos' ? ft : t === 'cod' ? cod : `<div class="cwhy2"><div style="display:flex;flex-direction:column;gap:10px;min-width:0">${why}</div><div>${datos}</div></div>`;
     return `<div class="mh"><h2>${nom}</h2>${kChip(x, r)}<span class="hint">registro #${r.A}${i >= 0 ? ` · ${i + 1} de ${fmtN(L.length)}` : ''} · ${esc(r.C)}</span><button class="btn sm ghost x" data-close type="button" title="Cerrar (Esc)">✕</button></div>
       <div class="mtabs">${tabs.map(([k, n]) => `<button type="button" data-act="cTab" data-t="${k}" class="${t === k ? 'on' : ''}">${n}</button>`).join('')}</div>
@@ -302,7 +304,7 @@ MODS.conteo = {
       <dt>Contado por</dt><dd>${esc(r.U)} · ${esc(dmy(r.fecha))}</dd>${fotos ? `<dt>Fotos</dt><dd>${fotos}</dd>` : ''}</dl>
       ${r.V ? `<div class="banner ${/^ℹ/.test(r.V) ? 'in' : 'wa'}" style="margin-bottom:10px">${esc(r.V)}</div>` : ''}
       <div class="why"><b>Por qué estos códigos</b><ol>${why.map(w => `<li>${w}</li>`).join('')}</ol></div>
-      ${cs.length ? `<div class="codes">${cs.map(c => `<span class="${c.R === 'Conservado' ? 'c' : c.R === 'Reciclado' ? 'r' : 'nw'}" title="${esc(c.R + ' · ' + c.F)} · clic: ficha" data-act="fcod" data-i="${c.n - 1}" style="cursor:pointer">${esc(c.B)}</span>`).join('')}</div><div class="legend" style="margin-top:8px"><span><i style="background:var(--okb)"></i>conservado</span><span><i style="background:var(--inb)"></i>reciclado</span><span><i style="background:#FCE7CF"></i>nuevo</span></div>` : ''}
+      ${cs.length ? `<div class="codes">${cs.map(c => `<span class="${c.R === 'Conservado' ? 'c' : c.R === 'Reciclado' ? 'r' : 'nw'}" title="${esc(c.R + ' · ' + c.F)} · clic: ficha" data-act="fcod" data-i="${c.n - 1}" style="cursor:pointer">${esc(c.B)}</span>`).join('')}</div><div class="legend" style="margin-top:8px"><span><i style="background:var(--okb)"></i>conservado</span><span><i style="background:var(--inb)"></i>reciclado</span><span><i style="background:var(--nwb)"></i>nuevo</span></div>` : ''}
       <div class="row" style="margin-top:12px"><a class="btn sm" href="${esc(CAP_URL)}" target="_top">📱 Corregir en la app de captura</a></div>`;
   }
 };
@@ -587,3 +589,5 @@ INP.ivY = el => { UI.inv.y = el.value; UI.inv.lim = 300; render(); };
 INP.ivU = el => { UI.inv.u = el.value; UI.inv.lim = 300; render(); };
 INP.ivQ = debounce(el => { UI.inv.q = el.value; UI.inv.lim = 300; $('#ivT').innerHTML = MODS.inventario.table(MODS.inventario.list()); }, 250);
 ACT.ivMore = () => { UI.inv.lim += 300; $('#ivT').innerHTML = MODS.inventario.table(MODS.inventario.list()); };
+
+ACT.tema = () => temaOscuro(!document.body.classList.contains('dark'));
