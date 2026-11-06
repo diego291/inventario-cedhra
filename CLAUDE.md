@@ -9,7 +9,7 @@ Antes de construir algo visible, Diego pide **imágenes con 3 opciones**; elige 
 3. Pruebas: `node tests/test_loader.js` y, si hay fixtures en `tests/privado/` (Diego los guarda en su Drive como *pruebas_privadas.zip*), las pruebas completas del motor (6 escenarios = Excel v10, 0 diferencias), servidor y navegador.
 4. `python3 tools/verificar.py` debe decir `dist OK`.
 5. Commit + push a la rama **`prueba`**. Avisar a Diego qué revisar en la hoja CONTEO – PRUEBA (llega en ≤ 5 min o con "Buscar actualización ahora").
-6. Cuando Diego aprueba: llevar `prueba` a `main` (fast-forward) y crear etiqueta `vX.Y.Z`.
+6. Cuando Diego aprueba: llevar `prueba` a `main` (fast-forward) y anotar el commit (las etiquetas se crean desde GitHub si se desean; `GH_REF` acepta rama, etiqueta o commit).
 
 ## Prohibido
 - Subir datos reales: nombres, DUI/NIP, códigos de acceso, inventario, respaldos, Excel. El repositorio es **público**.

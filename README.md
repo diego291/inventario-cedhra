@@ -28,7 +28,7 @@ verifica las huellas MD5, guarda copia en Drive ("Código del sistema") y los us
 - `tools/verificar.py` – lo corre GitHub en cada push.
 
 ## Volver atrás
-- Propiedades del script › `GH_REF` = etiqueta (p. ej. `v8.0.0`) o commit. Borrarla regresa a la rama.
+- Propiedades del script › `GH_REF` = commit (o etiqueta) de la versión buena. Borrarla regresa a la rama.
 - O en GitHub: revertir el commit.
 
 Instalación: ver [INSTALAR.md](INSTALAR.md).
