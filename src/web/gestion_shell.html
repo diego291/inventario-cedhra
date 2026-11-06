@@ -393,6 +393,29 @@ body.dark .toast{box-shadow:0 10px 30px rgba(0,0,0,.5)}
 .cgbg{display:grid;grid-template-columns:repeat(5,minmax(140px,1fr));gap:10px;margin-top:10px}.cgck{width:17px;height:17px;flex:none;accent-color:var(--ac)}
 @media (max-width:1100px){.cgbg{grid-template-columns:1fr 1fr}}
 @media (max-width:1100px){.cgh{grid-template-columns:1fr 1fr}.cgt{grid-column:1/-1}.cgh2{grid-template-columns:1fr 1fr}.cgrev{grid-template-columns:1fr}}
+
+/* ---- Panel principal v9.0 (combinado A+B+C, sin scroll largo) ---- */
+.ihero{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(260px,360px);gap:22px;align-items:stretch;background:linear-gradient(135deg,#14213D,#2D4A7C);color:#fff;border-radius:18px;padding:16px 22px}
+.iclk .t{font-size:40px;font-weight:700;line-height:1.05;font-variant-numeric:tabular-nums}.iclk .t span{font-size:15px;opacity:.8}.iclk small{color:#C9D3E3;font-size:12px;display:block}.iclk div{font-size:13.5px}
+.iprog{display:flex;flex-direction:column;justify-content:center;gap:8px;font-size:13px;min-width:0}.iprog b{font-size:20px}
+.ibar{display:flex;height:13px;border-radius:99px;overflow:hidden;background:rgba(255,255,255,.15)}.ibar u{display:block}
+.ileg{display:flex;gap:14px;font-size:12px;opacity:.92;flex-wrap:wrap}.ileg span::before{content:'';display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px;background:var(--c)}
+.inext{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:10px 14px;display:flex;flex-direction:column;gap:3px;min-width:0}.inext small{color:#C9D3E3;font-size:11.5px}.inext b{font-size:14px;line-height:1.3}.inext .btn{align-self:flex-start;margin-top:5px}
+.isteps{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));background:var(--card);border:1px solid var(--ln);border-radius:16px;overflow:hidden}
+.ist{border:0;border-right:1px solid var(--ln);background:none;text-align:left;font:inherit;color:var(--fg);padding:11px 14px 12px;cursor:pointer;display:flex;flex-direction:column;gap:1px;position:relative;min-width:0}.ist:last-child{border-right:0}.ist:hover{background:var(--hov)}
+.ist .n{font-size:10.5px;font-weight:700;color:var(--mu);letter-spacing:.06em;text-transform:uppercase}.ist b{font-size:24px;line-height:1.2;font-variant-numeric:tabular-nums}.ist b small{font-size:13px;color:var(--mu);font-weight:500}.ist b em{font-style:normal}
+.ist>small{color:var(--mu);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ist i{display:block;height:4px;border-radius:99px;background:var(--sf2);margin-top:7px;overflow:hidden}.ist i u{display:block;height:100%;background:var(--c)}
+.ist.now{background:var(--acb)}.ist.now::after{content:'AHORA';position:absolute;top:9px;right:10px;font-size:9px;font-weight:800;background:var(--ac);color:#fff;border-radius:99px;padding:2px 7px}
+.igrid2{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) 330px;gap:14px;align-items:stretch}
+.icol{display:flex;flex-direction:column;min-height:0;height:max(300px,calc(100vh - 455px));margin:0;gap:8px}
+.ich{display:flex;align-items:center;gap:8px;justify-content:space-between}.ich h2{margin:0;font-size:13px;text-transform:uppercase;letter-spacing:.07em;color:var(--mu)}
+.iscroll{overflow:auto;min-height:0;flex:1;display:flex;flex-direction:column;gap:8px;padding-right:2px}
+.iat{display:flex;gap:11px;align-items:center;padding:10px 11px;border:1px solid var(--ln);border-radius:12px;background:var(--sf)}.iat>div{flex:1;min-width:0}.iat b{display:block;font-size:13.5px}.iat small{color:var(--mu);font-size:12px;display:block}
+.iat .ic{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex:none;font-size:15px}.iat .ic.r{background:var(--badb);color:var(--bad)}.iat .ic.b{background:var(--inb);color:var(--in)}.iat .ic.y{background:var(--wab);color:var(--wa)}.iat .ic.g{background:var(--okb);color:var(--ok)}.iat .btn{white-space:nowrap}
+.iph{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--mu);margin:10px 0 2px}
+#calCard .cd{padding:5px 0 9px}
+@media (max-width:1250px){.ihero{grid-template-columns:auto minmax(0,1fr)}.inext{grid-column:1/-1}.isteps{grid-template-columns:repeat(3,minmax(0,1fr))}.ist:nth-child(3){border-right:0}.ist:nth-child(-n+3){border-bottom:1px solid var(--ln)}.igrid2{grid-template-columns:1fr 1fr}#calCard{grid-column:1/-1}.icol{height:auto;max-height:520px}}
+@media (max-width:760px){.ihero,.igrid2{grid-template-columns:1fr}.isteps{grid-template-columns:1fr 1fr}.iclk .t{font-size:32px}}
 </style>
 <style id="pageStyle">@page{size:letter;margin:12mm}</style>
 </head>

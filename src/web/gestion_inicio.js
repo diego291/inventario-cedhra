@@ -30,47 +30,90 @@ function marcasDia() {
   const hoy = HOY(); actividades().forEach(n => add(n.fecha, !n.hecho && n.fecha < hoy ? 'vence' : 'act'));
   return m;
 }
+/* ---------- v9.0: panel combinado (avance + siguiente paso + pasos + atención agrupada) ---------- */
+const AL_CAT = [[/Serie repetida/i, 'serie repetida'], [/otra ubicación/i, 'otra ubicación'], [/no exist/i, 'etiqueta que no existe'], [/otra familia/i, 'etiqueta de otra familia'],
+  [/ya registrad|ya está registrada/i, 'etiqueta ya usada'], [/Bloque repetido/i, 'bloque repetido'], [/no se reconoce|Indique qué bien/i, 'bien sin identificar'], [/otro bloque|cantidad debe|Sin cantidades/i, 'cantidad'], [/Falta/i, 'faltan datos']];
+function iniDatos() {
+  const st = { cerrada: 0, revision: 0, proceso: 0, pendiente: 0 }; X.act.forEach(l => st[X.estado(l)]++);
+  const tot = X.act.length || 1, now = Date.now(), dias = ms => Math.floor((now - ms) / 86400000);
+  const pend = D.actas.filter(a => !a.firm), porU = new Map();
+  pend.forEach(a => { const base = a.ent || a.gen, x = porU.get(a.u) || { u: a.u, n: 0, d: 0 }; x.n++; x.d = Math.max(x.d, dias(base)); porU.set(a.u, x); });
+  const actasU = [...porU.values()].sort((a, b) => b.d - a.d || b.n - a.n);
+  const cats = new Map(); X.alerts.forEach(r => { const c = (AL_CAT.find(x => x[0].test(r.V)) || [0, 'otras'])[1]; cats.set(c, (cats.get(c) || 0) + 1); });
+  const enRev = D.locs.filter(l => l.enRev), sinR = D.locs.filter(l => l.cerrada && !respOf(l.n).length);
+  let cg = null; try { if (typeof cgAll === 'function' && X.hasBase) { const A = cgAll(); if (A.n) cg = A; } } catch (e) {}
+  return { st, tot, actasU, nActas: pend.length, cats, enRev, sinR, cg };
+}
+/** Qué toca hacer ahora, en orden de prioridad. */
+function iniPasos(I) {
+  const L = [];
+  if (X.etqChanges.length) L.push({ s: 'rev', t: `Revisar ${fmtN(X.etqChanges.length)} código(s) ya etiquetados que cambiaron`, act: 'etqChanges', b: 'Ver cuáles' });
+  if (I.enRev.length) L.push({ s: 'rev', t: `Revisar y cerrar ${I.enRev.length} ubicación(es) en revisión: ${I.enRev.slice(0, 3).map(l => l.n).join(', ')}`, go: 'ubic', u: I.enRev[0].n, b: 'Revisar' });
+  if (X.alerts.length) L.push({ s: 'corr', t: `Corregir las ${fmtN(X.alerts.length)} alertas del conteo`, go: 'conteo', b: 'Ir al conteo' });
+  const viejas = I.actasU.filter(x => x.d >= 7);
+  if (viejas.length) L.push({ s: 'actas', t: `Recoger firmas: ${viejas.slice(0, 3).map(x => `${x.u} (${x.d} días)`).join(', ')}${viejas.length > 3 ? ` y ${viejas.length - 3} más` : ''}`, go: 'ubic', u: viejas[0].u, b: 'Ver actas' });
+  if (I.st.proceso + I.st.pendiente) L.push({ s: 'contar', t: `Terminar de contar: ${I.st.proceso + I.st.pendiente} ubicación(es) sin cerrar`, go: 'ubic', b: 'Ver ubicaciones' });
+  if (I.nActas && !viejas.length) L.push({ s: 'actas', t: `Recoger firmas de ${fmtN(I.nActas)} acta(s)`, go: 'ubic', u: I.actasU[0].u, b: 'Ver actas' });
+  if (I.cg && I.cg.n - I.cg.carg) L.push({ s: 'rep', t: `Cargo masivo SIGES: ${fmtN(I.cg.ok)} de ${fmtN(I.cg.n - I.cg.carg)} bienes nuevos listos`, go: 'cargo', b: 'Abrir' });
+  if (!L.length) L.push({ s: 'rep', t: 'Todo al día: generar reportes finales', go: 'reportes', b: 'Reportes' });
+  return L;
+}
+const iniBtn = (x, cls) => x.act ? `<button class="btn ${cls || ''}" type="button" data-act="${x.act}">${esc(x.b)} →</button>` : `<button class="btn ${cls || ''}" type="button" data-act="iniGo" data-go="${x.go}" data-u="${esc(x.u || '')}">${esc(x.b)} →</button>`;
 MODS.inicio = {
   html() {
-    const now = new Date(), [h, ap] = horaTxt(now), ev = actividades().filter(n => n.fecha === HOY()), hechas = ev.filter(n => n.hecho).length;
-    const atras = actividades().filter(n => !n.hecho && n.fecha < HOY()).length, st = { cerrada: 0, revision: 0, proceso: 0, pendiente: 0 }; X.act.forEach(l => st[X.estado(l)]++);
-    const sinFirma = D.actas.filter(a => !a.firm).length, sal = now.getHours() < 12 ? '☀ Buenos días' : now.getHours() < 19 ? '🌤 Buenas tardes' : '🌙 Buenas noches';
-    return `<div class="search-big" data-act="search" role="button">🔎 <span>Buscar bien, código, serie, ubicación o persona…</span><kbd>Ctrl + K</kbd></div>
-    <div class="igrid">
-      <div class="istack"><div class="clock"><small>Semana ${semanaISO(now)} · Día ${diaAnio(now)} del año</small><div class="t" id="clk">${h} <span>${ap}</span></div><div>${DIAS[now.getDay()].replace(/^./, c => c.toUpperCase())}, ${now.getDate()} de ${MESES[now.getMonth()]} de ${now.getFullYear()}</div><small>${sal} · ${esc(BASE.cfg.periodo || 'Conteo físico')}</small>
-        <div class="row" style="margin-top:10px;gap:20px"><div><b>${ev.length}</b><br><small>hoy</small></div><div><b>${hechas}</b><br><small>hechas</small></div><div><b>${atras}</b><br><small>atrasadas</small></div></div></div>
-        <div class="card"><div class="kgrid">
-          <div class="kpi" data-act="go" data-m="ubic" role="button"><span>Cerradas</span><b style="color:var(--ok)">${X.cerradas}<small style="display:inline;font-size:13px"> de ${X.act.length}</small></b></div>
-          <div class="kpi" data-act="go" data-m="ubic" role="button"><span>En revisión</span><b style="color:var(--in)">${st.revision}</b></div>
-          <div class="kpi" data-act="go" data-m="codigos" role="button"><span>Bienes contados</span><b>${fmtN(R.cons.bienes)}</b><small>${fmtN(R.cod.length)} códigos</small></div>
-          <div class="kpi" data-act="go" data-m="ubic" role="button"><span>Actas sin firmar</span><b style="color:var(--wa)">${sinFirma}</b></div>
-          <div class="kpi" data-act="go" data-m="conteo" role="button"><span>Alertas</span><b style="color:${X.alerts.length ? 'var(--bad)' : 'var(--ok)'}">${X.alerts.length}</b></div>
-          <div class="kpi" data-act="go" data-m="reportes" role="button"><span>A descargar</span><b>${fmtN(R.descargos.tot.codigos)}</b><small>${money(R.descargos.tot.valor)}</small></div></div></div></div>
-      <div class="card" id="calCard">${this.cal()}</div>
-      <div class="card" id="agCard">${this.agenda()}</div>
-    </div>`;
+    const now = new Date(), [h, ap] = horaTxt(now), I = iniDatos(), P = iniPasos(I), st = I.st, tot = I.tot;
+    const sal = now.getHours() < 12 ? '☀ Buenos días' : now.getHours() < 19 ? '🌤 Buenas tardes' : '🌙 Buenas noches', w = n => (n / tot * 100).toFixed(1) + '%';
+    const pc = Math.round(st.cerrada / tot * 100), cur = P[0].s, A = this.atn(I);
+    const step = (k, n, lbl, big, sub, pct, color, go) => `<button type="button" class="ist${cur === k ? ' now' : ''}" data-act="iniGo" data-go="${go}" style="--c:${color}"><span class="n">${n} · ${lbl}</span><b>${big}</b><small>${sub}</small><i><u style="width:${Math.max(0, Math.min(100, pct))}%"></u></i></button>`;
+    const contados = tot - st.pendiente, nAct = D.actas.length;
+    return `<div class="ihero"><div class="iclk"><small>${sal}, ${esc(shortName(ME.nombre || ''))}</small><div class="t" id="clk">${h} <span>${ap}</span></div><div>${DIAS[now.getDay()].replace(/^./, c => c.toUpperCase())}, ${now.getDate()} de ${MESES[now.getMonth()]}</div><small>Semana ${semanaISO(now)} · ${esc(BASE.cfg.periodo || 'Conteo físico')}</small></div>
+      <div class="iprog"><div class="row"><span>Avance del conteo</span><span style="flex:1"></span><b>${st.cerrada}</b>&nbsp;de ${X.act.length} ubicaciones cerradas · <b>&nbsp;${pc}%</b></div>
+        <div class="ibar"><u style="width:${w(st.cerrada)};background:#5BC08A"></u><u style="width:${w(st.revision)};background:#6FA3E0"></u><u style="width:${w(st.proceso)};background:#F0B05A"></u></div>
+        <div class="ileg"><span style="--c:#5BC08A">Cerradas ${st.cerrada}</span><span style="--c:#6FA3E0">En revisión ${st.revision}</span><span style="--c:#F0B05A">Contando ${st.proceso}</span><span style="--c:rgba(255,255,255,.3)">Sin empezar ${st.pendiente}</span></div></div>
+      <div class="inext"><small>👉 Siguiente paso</small><b>${esc(P[0].t)}</b>${P[1] ? `<small>Después: ${esc(P[1].t)}</small>` : ''}${iniBtn(P[0], 'pri sm')}</div></div>
+    <div class="isteps">${step('contar', 1, 'Contar', `${contados}<small> / ${X.act.length}</small>`, `${fmtN(R.cons.bienes)} bienes contados`, contados / tot * 100, 'var(--ac)', 'conteo')}
+      ${step('corr', 2, 'Corregir', `<em style="color:${X.alerts.length ? 'var(--bad)' : 'var(--ok)'}">${fmtN(X.alerts.length)}</em>`, X.alerts.length ? 'alertas por resolver' : 'sin alertas', R.logical.length ? (1 - X.alerts.length / R.logical.length) * 100 : 100, 'var(--bad)', 'conteo')}
+      ${step('rev', 3, 'Revisar', `${st.revision + X.etqChanges.length}`, st.revision ? 'ubicación(es) en revisión' : X.etqChanges.length ? 'códigos que cambiaron' : 'nada pendiente', st.revision || X.etqChanges.length ? 30 : 100, 'var(--in)', 'ubic')}
+      ${step('cerrar', 4, 'Cerrar', `${st.cerrada}<small> / ${X.act.length}</small>`, 'ubicaciones cerradas', pc, 'var(--ok)', 'ubic')}
+      ${step('actas', 5, 'Actas', `<em style="color:${I.nActas ? 'var(--wa)' : 'var(--ok)'}">${fmtN(I.nActas)}</em>`, I.nActas ? 'sin firmar' : 'todas firmadas', nAct ? (1 - I.nActas / nAct) * 100 : 0, '#7A4FB5', 'ubic')}
+      ${step('rep', 6, 'Reportes', fmtN(R.descargos.tot.codigos), `a descargo · ${money(R.descargos.tot.valor)}`, I.cg ? I.cg.ok / Math.max(1, I.cg.n) * 100 : 0, 'var(--navy2, #5B7BB0)', 'reportes')}</div>
+    <div class="igrid2"><div class="card icol"><div class="ich"><h2>Requiere atención</h2><span class="chip ${A.length ? 'bad' : 'ok'}">${A.length ? A.length + ' grupo' + (A.length > 1 ? 's' : '') : '✔'}</span></div><div class="iscroll">${A.join('') || '<div class="hint">Nada pendiente. 🎉</div>'}</div></div>
+      <div class="card icol" id="agCard">${this.agenda()}</div>
+      <div class="card icol" id="calCard">${this.cal()}</div></div>`;
+  },
+  atn(I) {
+    const it = (ic, cls, t, sub, x) => `<div class="iat"><span class="ic ${cls}">${ic}</span><div><b>${t}</b><small>${sub}</small></div>${iniBtn(x, 'sm ghost')}</div>`, o = [];
+    if (X.etqChanges.length) o.push(it('⚠', 'r', `${fmtN(X.etqChanges.length)} código(s) etiquetados cambiaron`, [...new Set(X.etqChanges.map(x => x.u))].slice(0, 6).join(', ') + ' · revisar antes de seguir', { act: 'etqChanges', b: 'Ver' }));
+    if (X.alerts.length) o.push(it('⚠', 'r', `${fmtN(X.alerts.length)} alertas en el conteo`, [...I.cats].sort((a, b) => b[1] - a[1]).map(([c, n]) => `${c} ${n}`).join(' · '), { go: 'conteo', b: 'Corregir' }));
+    if (I.enRev.length) o.push(it('🔔', 'b', `${I.enRev.length} ubicación(es) esperan revisión`, I.enRev.map(l => l.n + (l.rev && l.rev.sol ? ` (pidió ${l.rev.sol.por})` : '')).join(', '), { go: 'ubic', u: I.enRev[0].n, b: 'Revisar' }));
+    if (I.nActas) o.push(it('✍', 'y', `${fmtN(I.nActas)} acta(s) sin firmar`, I.actasU.slice(0, 4).map(x => `${x.u} · ${x.d} día${x.d === 1 ? '' : 's'}${x.n > 1 ? ` (${x.n} juegos)` : ''}`).join(' · ') + (I.actasU.length > 4 ? ` · y ${I.actasU.length - 4} ubicaciones más` : ''), { go: 'ubic', u: I.actasU[0].u, b: 'Ver actas' }));
+    if (I.sinR.length) o.push(it('👤', 'y', `${I.sinR.length} ubicación(es) cerradas sin responsable`, I.sinR.slice(0, 8).map(l => l.n).join(', '), { go: 'ubic', u: I.sinR[0].n, b: 'Asignar' }));
+    if (I.st.proceso + I.st.pendiente) o.push(it('📍', 'b', `${I.st.proceso + I.st.pendiente} ubicación(es) sin cerrar`, `${I.st.proceso} contando · ${I.st.pendiente} sin empezar`, { go: 'ubic', b: 'Ver' }));
+    if (I.cg && I.cg.n - I.cg.carg) o.push(it('📤', I.cg.err ? 'y' : 'g', `Cargo SIGES: ${fmtN(I.cg.ok)} de ${fmtN(I.cg.n - I.cg.carg)} listos`, I.cg.err ? `${fmtN(I.cg.err)} bienes nuevos con datos pendientes` : 'listos para descargar el Excel', { go: 'cargo', b: 'Abrir' }));
+    return o;
   },
   cal() {
     const y = CAL.y, m = CAL.m, first = new Date(y, m, 1), start = new Date(y, m, 1 - ((first.getDay() + 6) % 7)), marks = marcasDia(), hoy = HOY();
     let cells = ''; for (let i = 0; i < 42; i++) { const d = new Date(start); d.setDate(start.getDate() + i); const k = ymdL(d), mk = marks[k];
       cells += `<button type="button" class="cd${d.getMonth() !== m ? ' o' : ''}${k === hoy ? ' t' : ''}${k === CAL.sel ? ' s' : ''}" data-act="calDay" data-d="${k}">${d.getDate()}${mk ? `<i>${[...mk].slice(0, 4).map(x => `<u class="${x}"></u>`).join('')}</i>` : ''}</button>`; }
-    const prox = []; for (let i = 1; i <= 7; i++) { const d = new Date(); d.setDate(d.getDate() + i); const k = ymdL(d); actividades().filter(n => n.fecha === k && !n.hecho).forEach(n => prox.push(`<div class="ev sm" data-act="calDay" data-d="${k}"><span class="h">${DIAS[d.getDay()].slice(0, 3).toUpperCase()} ${d.getDate()}</span><div><b>${esc(n.texto)}</b>${n.hora ? `<small>${esc(n.hora)}</small>` : ''}</div></div>`)); }
     return `<div class="row"><button class="btn sm ghost" data-act="calMv" data-d="-1" type="button">◀</button><b style="font-size:15px">${MESES[m].replace(/^./, c => c.toUpperCase())} ${y}</b><button class="btn sm ghost" data-act="calMv" data-d="1" type="button">▶</button><span style="flex:1"></span><button class="btn sm" data-act="calHoy" type="button">Hoy</button></div>
       <div class="cal">${['LU', 'MA', 'MI', 'JU', 'VI', 'SÁ', 'DO'].map(d => `<b>${d}</b>`).join('')}${cells}</div>
       <div class="legend"><span><i style="background:var(--ac)"></i>conteo</span><span><i style="background:var(--ok)"></i>cierre</span><span><i style="background:var(--in)"></i>actas</span><span><i style="background:#7A4FB5"></i>actividad</span><span><i style="background:var(--bad)"></i>vencida</span></div>
-      <h2 style="margin-top:6px">Próximos 7 días</h2>${prox.join('') || '<div class="hint">Nada programado para los próximos días.</div>'}`;
+`;
   },
   agenda() {
     const d = CAL.sel, esHoy = d === HOY(), dd = new Date(d + 'T12:00:00'), L = actividades().filter(n => n.fecha === d).sort((a, b) => (a.hora || '99') < (b.hora || '99') ? -1 : 1);
-    const auto = esHoy ? autoEventos() : [], atr = esHoy ? actividades().filter(n => !n.hecho && n.fecha < d) : [];
+    const auto = [], atr = esHoy ? actividades().filter(n => !n.hecho && n.fecha < d) : [];
     const avisos = [[-1, 'Sin aviso'], [0, 'A la hora'], [5, '5 min antes'], [15, '15 min antes'], [30, '30 min antes'], [60, '1 hora antes'], [1440, '1 día antes']];
     const item = n => `<div class="ev${n.hecho ? ' done' : ''}"><input type="checkbox" data-ch="agDone" data-id="${esc(n.id)}"${n.hecho ? ' checked' : ''}><span class="h">${esc(n.hora || '—')}</span><div style="flex:1;min-width:0"><b>${esc(n.texto)}</b><small>${n.comp ? '👥 compartida · ' : ''}${esc(n.por)}${n.vinc ? ' · 🔗 ' + esc(n.vinc) : ''}${n.fecha !== d ? ' · <span style="color:var(--bad)">era para el ' + esc(dmy(n.fecha)) + '</span>' : ''}</small>
       <div class="row" style="gap:6px;margin-top:4px"><select data-ch="agAviso" data-id="${esc(n.id)}" title="Recordatorio">${avisos.map(([v, t]) => `<option value="${v}"${(n.aviso ?? -1) == v ? ' selected' : ''}>🔔 ${t}</option>`).join('')}</select><button class="btn sm ghost bad" data-act="agDel" data-id="${esc(n.id)}" type="button" title="Borrar">✕ Borrar</button></div></div></div>`;
-    return `<div class="row"><h2 style="margin:0">${esHoy ? 'Agenda de hoy' : 'Agenda del ' + DIAS[dd.getDay()] + ' ' + dmy(d)}</h2><span class="meta">${L.filter(n => !n.hecho).length} pendiente(s)</span></div>
+    const prox = []; for (let i = 1; i <= 7; i++) { const d = new Date(); d.setDate(d.getDate() + i); const k = ymdL(d); actividades().filter(n => n.fecha === k && !n.hecho).forEach(n => prox.push(`<div class="ev sm" data-act="calDay" data-d="${k}"><span class="h">${DIAS[d.getDay()].slice(0, 3).toUpperCase()} ${d.getDate()}</span><div><b>${esc(n.texto)}</b>${n.hora ? `<small>${esc(n.hora)}</small>` : ''}</div></div>`)); }
+    return `<div class="ich"><h2 style="margin:0">${esHoy ? 'Agenda de hoy' : 'Agenda del ' + DIAS[dd.getDay()] + ' ' + dmy(d)}</h2><span class="meta">${L.filter(n => !n.hecho).length} pendiente(s)</span></div>
       <div class="row" style="flex-wrap:nowrap"><input type="text" id="agIn" placeholder="Escriba: “jueves 9am contar bodega 1”, “mañana 10:30 entregar actas A10”…" style="flex:1;min-width:0"><label class="row hint" style="gap:4px;flex-wrap:nowrap" title="La ven todos los supervisores"><input type="checkbox" id="agComp" checked> 👥</label><button class="btn sm pri" data-act="agAdd" type="button">+</button></div>
       <div class="hint" id="agPrev"></div>
-      <div class="evs">${atr.map(item).join('')}${L.map(item).join('')}${auto.map(a => `<div class="ev auto" data-act="agGo" data-go="${a.go}" data-u="${esc(a.u || '')}" role="button"><span class="h">⚙</span><div style="flex:1;min-width:0"><b>${esc(a.t)}</b><small>Automático · ${esc(a.s)}</small></div><span class="hint">→</span></div>`).join('')}
-      ${!L.length && !auto.length && !atr.length ? '<div class="hint">Sin actividades para este día. Escriba arriba para agregar una.</div>' : ''}</div>`;
+      <div class="evs iscroll">${atr.map(item).join('')}${L.map(item).join('')}${auto.map(a => `<div class="ev auto" data-act="agGo" data-go="${a.go}" data-u="${esc(a.u || '')}" role="button"><span class="h">⚙</span><div style="flex:1;min-width:0"><b>${esc(a.t)}</b><small>Automático · ${esc(a.s)}</small></div><span class="hint">→</span></div>`).join('')}
+      ${!L.length && !auto.length && !atr.length ? '<div class="hint">Sin actividades para este día. Escriba arriba para agregar una.</div>' : ''}
+      ${esHoy ? `<h3 class="iph">Próximos 7 días</h3>${prox.join('') || '<div class="hint">Nada programado para los próximos días.</div>'}` : ''}</div>`;
   },
   after() { const i = $('#agIn'); if (i) i.addEventListener('input', () => { const p = parseActividad(i.value); $('#agPrev').textContent = i.value.trim() ? `→ ${p.fecha ? DIAS[new Date(p.fecha + 'T12:00:00').getDay()] + ' ' + dmy(p.fecha) : ''}${p.hora ? ' a las ' + p.hora : ''} · “${p.texto}”` : ''; });
     if (i) i.addEventListener('keydown', e => { if (e.key === 'Enter') ACT.agAdd(); }); }
@@ -108,6 +151,7 @@ Object.assign(ACT, {
     catch (e) { toast(errMsg(e), true); i.disabled = false; }
   },
   agDel: b => confirmModal('¿Borrar esta actividad?', 'Borrar', async () => { const r = await api('api_g_notaDel', b.dataset.id); D.notas = r.notas; derive(); render(); }),
+  iniGo: b => { const g = b.dataset.go, u = b.dataset.u; if (g === 'conteo') { UI.conteo.f = X.alerts.length ? 'alerta' : ''; UI.conteo.u = ''; } if (g === 'ubic' && u) { UI.ubic.sel = u; UI.ubic.tab = 'docs'; } go(g); },
   agGo: b => { if (b.dataset.u) UI.ubic.sel = b.dataset.u; if (b.dataset.go === 'ubic') UI.ubic.tab = 'docs'; if (b.dataset.go === 'conteo') { UI.conteo.f = 'alerta'; UI.conteo.u = ''; } go(b.dataset.go); }
 });
 async function notaPatch(id, patch) { const n = (D.notas || []).find(x => x.id === id); if (!n) return; const r = await api('api_g_nota', Object.assign({}, n, patch)); D.notas = r.notas; derive(); }
