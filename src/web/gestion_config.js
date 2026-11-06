@@ -1,5 +1,5 @@
 /* ===================== CONFIGURACIÓN ===================== */
-const CFG_TABS = { importar: 'Importar del Excel v10', general: 'General', reglas: 'Reglas de códigos', familia: 'Corrección de familia', eq: 'Equivalencias', textos: 'Textos del acta', sistema: 'Sistema' };
+const CFG_TABS = { importar: 'Importar del Excel v10', general: 'General', reglas: 'Reglas de códigos', extracod: 'Códigos después del corte', familia: 'Corrección de familia', eq: 'Equivalencias', textos: 'Textos del acta', sistema: 'Sistema' };
 let SYS = null;
 let IMP = null, EQED = null, RCED = null, EXF = { code: '', ubic: '', fecha: '', valor: '', serie: '', obs: '' };
 MODS.config = {
@@ -72,13 +72,12 @@ MODS.config = {
       <div class="card cfgsec"><h2>Bloques a conservar completos</h2><p class="hint" style="margin:0">Uno por línea: <span class="mono">5404</span> (el bloque en todas las instituciones) o <span class="mono">11674-1133</span> (solo esa institución).</p>
       <textarea id="consBlqTxt" rows="8" class="mono">${esc((BASE.consBlq || []).join('\n'))}</textarea>
       <div><button class="btn pri" data-act="reglasSave" data-which="cons" type="button">Guardar bloques</button></div></div></div>
-      ${this.extra()}
       <div class="banner wa">Cambiar estas reglas cambia los códigos asignados. Hágalo antes de etiquetar; si ya hay ubicaciones etiquetadas, el sistema avisará qué códigos cambiaron.</div>`;
   },
-  extra() {
+  extracod() {
     const L = BASE.extra || [], f = EXF, ro = !isAdmin();
     const chk = extraCheck(f.code), locs = D.locs.map(l => `<option value="${esc(l.n)}"${norm(f.ubic) === norm(l.n) ? ' selected' : ''}>${esc(l.n)}${l.t ? ' · ' + esc(l.t) : ''}</option>`).join('');
-    return `<div class="card cfgsec" style="margin-top:16px"><h2>Códigos registrados después del corte <span class="meta">${L.length} agregado(s)</span></h2>
+    return `<div class="card cfgsec"><h2>Códigos registrados después del corte <span class="meta">${L.length} agregado(s)</span></h2>
       <p class="hint" style="margin:0">Códigos que <b>sí están en SIGES</b> pero no venían en el inventario anterior porque se registraron después de la fecha en que se imprimió. Se <b>conservan</b> solo si cumplen las reglas (institución, bloque del catálogo) y el bien se cuenta <b>con esa etiqueta en la ubicación indicada</b>. Mientras no aparezca, el código queda reservado (nadie más lo recibe).</p>
       ${ro ? '' : `<div class="exform">
         <div class="field"><span class="lbl">Código</span><input type="text" class="mono" data-in="exCode" value="${esc(f.code)}" placeholder="11674-1103-0016" maxlength="15" autocomplete="off"><span class="hint" id="exChk">${chk.html}</span></div>
