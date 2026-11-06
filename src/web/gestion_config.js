@@ -18,6 +18,8 @@ MODS.config = {
         <div class="row"><span style="flex:1">Publicada</span><b>${esc(s.fecha || '—')}</b></div>
         <div class="row"><span style="flex:1">Origen</span><b class="mono">${esc(s.repo || '')} · ${esc(s.ref || '')}</b></div>
         <div class="row"><span style="flex:1">Cargador de Apps Script</span><b class="mono">v${esc(s.cargador || 1)}${(s.cargador || 1) < 2 ? ' · pegar el nuevo' : ''}</b></div>
+        ${window.CARGA ? `<div class="row"><span style="flex:1">Última carga de datos</span><b>${(CARGA.total / 1000).toFixed(1)} s</b></div>
+        <div class="row hint"><span style="flex:1">servidor (leer hojas) · red · cálculo de códigos</span><span>${(CARGA.servidor / 1000).toFixed(1)} · ${(CARGA.red / 1000).toFixed(1)} · ${(CARGA.calculo / 1000).toFixed(1)} s${CARGA.base ? ' · con datos base' : ''}</span></div>` : ''}
         <div class="row"><span style="flex:1">Copia de respaldo en Drive</span><b>${s.respaldo ? '✔ ' + esc(s.respaldo) : '—'}</b></div></div>`}
       <p class="hint" style="margin:0">Las mejoras llegan solas desde GitHub: el sistema revisa cada 5 minutos si hay una versión nueva. Si GitHub no responde, sigue funcionando con la copia guardada en su Drive.</p>
       <div class="row"><button class="btn pri" data-act="sysUpd" type="button"${isAdmin() ? '' : ' disabled'}>⟳ Buscar actualización ahora</button><button class="btn" data-act="sysRef" type="button">Volver a consultar</button></div></div></div>`;
@@ -176,13 +178,34 @@ ACT.impGo = async b => {
 
 /* ===================== ARRANQUE ===================== */
 async function start() {
+  window.CARGA0 = window.CARGA0 || performance.now();
   $('#loading').hidden = false; $('#login').hidden = true;
+  // Apertura instantánea: muestra lo último que se vio en este equipo y actualiza desde Drive en segundo plano.
+  const snap = LS.get('gsnap', null), gb = LS.get('gbase', null);
+  if (snap && snap.d && gb && gb.base && gb.gver === snap.d.gver && Date.now() - snap.t < 7 * 864e5) {
+    try {
+      D = snap.d; BASE = gb.base; ME = D.me; recompute(); D.loadedAt = 0;
+      mostrarApp(); setSync('busy', 'Mostrando datos guardados · actualizando…');
+      load().then(() => { if (editando()) { setSync('ok', 'Hay datos nuevos · toque ↻'); return; } const y = scrollY; render(); scrollTo(0, y); })
+        .catch(e => { if (isAuth(e)) return; setSync('err', 'Sin conexión · mostrando datos guardados'); });
+      return;
+    } catch (e) { D = null; BASE = null; }
+  }
   try { await load(); }
   catch (e) { if (isAuth(e)) return; if (/permiso/i.test(errMsg(e))) { showLogin('Este módulo es solo para supervisores y el administrador.'); return; } $('#loadingMsg').innerHTML = esc(errMsg(e)) + '<br><button class="btn" onclick="start()" type="button">Reintentar</button>'; return; }
+  mostrarApp();
+}
+function mostrarApp() {
   $('#meName').textContent = ME.nombre; $('#meRol').textContent = ME.rol + (BASE.cfg.nombre ? ' · ' + BASE.cfg.nombre : '');
   $('#brandPer').textContent = BASE.cfg.periodo || 'Conteo físico';
   $('#loading').hidden = true; $('#app').hidden = false; render();
   window.__ready = true;
+}
+/** Hay algo a medio editar (no se debe redibujar la pantalla). */
+function editando() {
+  if (!$('#modal').hidden) return true;
+  const a = document.activeElement; if (a && a.closest && a.closest('#main') && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.type !== 'search') return true;
+  return (UI.cat && UI.cat.ce && UI.cat.ce.on) || !!(EQED || RCED);
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && D && Date.now() - (D.loadedAt || 0) > 120000 && !$('#app').hidden) ACT.refresh(); });
 window.start = start;

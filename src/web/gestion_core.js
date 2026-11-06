@@ -47,7 +47,7 @@ const UI = { conteo: { u: '', f: '', q: '', sel: null, lim: 300 }, codigos: { u:
 function setSync(st, txt) { const s = $('#sync'); if (!s) return; s.className = 'sync' + (st === 'busy' ? ' busy' : st === 'err' ? ' err' : ''); s.textContent = txt; }
 
 /* ---------- inicio de sesión ---------- */
-function showLogin(msg) { $('#loading').hidden = true; $('#app').hidden = true; $('#login').hidden = false; $('#loginMsg').textContent = msg || ''; TOKEN = ''; LS.set('tok', ''); }
+function showLogin(msg) { try { localStorage.removeItem('gsnap'); } catch (e) {} $('#loading').hidden = true; $('#app').hidden = true; $('#login').hidden = false; $('#loginMsg').textContent = msg || ''; TOKEN = ''; LS.set('tok', ''); }
 $('#btnLogin').onclick = async () => {
   const code = $('#inCode').value.trim(); if (!code) return;
   $('#btnLogin').disabled = true; $('#loginMsg').textContent = 'Verificando…';
@@ -67,13 +67,19 @@ $('#lnkCap').href = CAP_URL; $('#lnkCapLogin').href = CAP_URL;
 /* ---------- carga y cálculo ---------- */
 async function load(quiet) {
   setSync('busy', 'Actualizando…');
-  const cached = LS.get('gbase', null);
+  const cached = LS.get('gbase', null), t0 = performance.now();
   const r = await api('api_g_data', cached && cached.base ? cached.gver : '');
+  const t1 = performance.now();
   if (r.base) { BASE = r.base; try { localStorage.setItem('gbase', JSON.stringify({ gver: r.gver, base: r.base })); } catch (e) { try { localStorage.removeItem('gbase'); } catch (e2) {} } }
   else BASE = cached.base;
   D = r; ME = r.me;
   recompute();
   D.loadedAt = Date.now();
+  // tiempos de la última carga (se ven en Configuración › Sistema)
+  window.CARGA = { total: Math.round(performance.now() - t0), servidor: r.ms || 0, red: Math.max(0, Math.round(t1 - t0 - (r.ms || 0))), calculo: R.ms || 0, base: !!r.base, inicio: window.CARGA0 ? Math.round(performance.now() - window.CARGA0) : null };
+  window.CARGA0 = null;
+  // copia local para abrir al instante la próxima vez (los datos siguen viniendo de Drive)
+  try { const snap = Object.assign({}, r); delete snap.base; snap.gver = r.gver; localStorage.setItem('gsnap', JSON.stringify({ t: Date.now(), d: snap })); } catch (e) { try { localStorage.removeItem('gsnap'); } catch (e2) {} }
   setSync('ok', 'Sincronizado con la app de captura · ' + dt(D.now).slice(-5));
 }
 function recompute() {

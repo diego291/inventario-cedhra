@@ -153,11 +153,12 @@ function appUrl_() { try { return ScriptApp.getService().getUrl() || ''; } catch
 /* ================= API ================= */
 /** Todo lo que necesita el módulo. Los datos base (inventario, catálogo…) solo viajan si cambiaron. */
 function api_g_data(tok, knownG) {
-  var u = auth_(tok, 'Supervisor'), gv = getKey_('gver');
+  var t0 = Date.now(), u = auth_(tok, 'Supervisor'), gv = getKey_('gver');
   var out = { me: userPublic_(u), gver: gv, regs: gRegs_(), locs: locsOut_(), resp: gResp_(), actas: gActas_(), textos: gTextos_(), etq: gEtq_(),
     personas: gPersonas_(), traslados: gTraslados_(), notas: gNotas_(u), plantillas: gPlantillas_(), justif: gJustif_(),
     url: appUrl_(), ssId: ss_().getId(), now: Date.now() };
   if (knownG !== gv) out.base = gBase_();
+  out.ms = Date.now() - t0;
   return out;
 }
 /** Importa los datos base desde el Excel v10 (el navegador lee el archivo y envía solo los datos). */
