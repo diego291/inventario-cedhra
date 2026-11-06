@@ -8,7 +8,7 @@ Antes de construir algo visible, Diego pide **imágenes con 3 opciones**; elige 
 2. `python3 build.py X.Y.Z` subiendo la versión (VERSION). Siempre versión nueva, aunque sea un arreglo pequeño.
 3. Pruebas: `node tests/test_loader.js` y, si hay fixtures en `tests/privado/` (Diego los guarda en su Drive como *pruebas_privadas.zip*), las pruebas completas del motor (6 escenarios = Excel v10, 0 diferencias), servidor y navegador.
 4. `python3 tools/verificar.py` debe decir `dist OK`.
-5. Commit + push **directo a `main`** (decisión de Diego, 05/11/2026: no usar la rama `prueba` ni pedir aprobación antes de publicar). Llega solo en ≤ 5 min o con "Buscar actualización ahora".
+5. Commit + push **directo a `main`** (decisión de Diego, 05/11/2026: no usar la rama `prueba` ni pedir aprobación antes de publicar). Desde v8.4 las pantallas piden revisar GitHub al abrir, al volver a la pestaña y cada 3 min (`api_sys_revisar`), y muestran "Hay una versión nueva · Recargar".
 6. Si algo sale mal: revertir el commit o fijar `GH_REF` a un commit anterior.
 
 ## Prohibido

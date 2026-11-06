@@ -33,15 +33,15 @@ def pack(shell, js):
     s = s.replace('<!--APPJS-->', loader)
     s = s.replace("<?= ScriptApp.getService().getUrl() ?>", '%%APP_URL%%')
     assert '<?' not in s, 'quedó una etiqueta de plantilla en ' + shell
-    return s.replace('</head>', '<meta name="sistema-version" content="' + ver + '">\n</head>', 1)
+    return s.replace('</head>', '<meta name="sistema-version" content="' + ver + '">\n<script>window.SISTEMA_VERSION = ' + json.dumps(ver) + ';</script>\n</head>', 1)
 
 motor = rd('src/motor.js')
 web = ['gestion_core.js', 'gestion_docs.js', 'gestion_ficha.js', 'gestion_ubic.js', 'gestion_reportes.js', 'gestion_inicio.js', 'gestion_config.js']
 out = {
     'nucleo': "/* NÚCLEO DEL SISTEMA DE INVENTARIO · generado por build.py — no editar aquí, editar src/ */\nvar NUCLEO_VERSION = '" + ver + "';\n"
               + rd('src/servidor/Code.gs') + '\n' + motor + '\n' + rd('src/servidor/GestionServidor.gs') + '\n',
-    'index': pack('src/web/captura_shell.html', rd('src/web/captura.js')),
-    'gestion': pack('src/web/gestion_shell.html', motor + '\n' + '\n'.join(rd('src/web/' + f) for f in web)),
+    'index': pack('src/web/captura_shell.html', rd('src/web/captura.js') + '\n' + rd('src/web/actualizar.js')),
+    'gestion': pack('src/web/gestion_shell.html', motor + '\n' + '\n'.join(rd('src/web/' + f) for f in web) + '\n' + rd('src/web/actualizar.js')),
 }
 names = {'nucleo': 'nucleo.js', 'index': 'index.html', 'gestion': 'gestion.html'}
 md5 = {}

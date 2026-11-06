@@ -83,6 +83,15 @@ const up = JSON.parse(srv.call('api_sys_actualizar', JSON.stringify([tok])));
 ok(up.version === '99.0.4', 'Gestión › Sistema › "Buscar actualización ahora" instala 99.0.4 sin esperar');
 bad(() => srv.call('api_sys_actualizar', JSON.stringify(['x'])), /código|Ingrese/, 'actualizar ahora exige administrador');
 
+// 10b. revisión forzada desde las pantallas: adopta al instante (sin esperar 5 min), como mucho 1 cada 30 s
+publicar('99.0.5'); nuevaEjecucion();
+ok(JSON.parse(srv.call('api_sys_revisar', '[]')).version === '99.0.5', 'api_sys_revisar: la versión nueva se adopta al abrir la pantalla, sin esperar');
+publicar('99.0.6'); nuevaEjecucion();
+ok(JSON.parse(srv.call('api_sys_revisar', '[]')).version === '99.0.5', 'dos revisiones forzadas seguidas: la segunda espera 30 s (no satura GitHub)');
+srv.CacheService.getScriptCache().remove('INV1_frc'); nuevaEjecucion();
+ok(JSON.parse(srv.call('api_sys_revisar', '[]')).version === '99.0.6', 'pasados 30 s vuelve a revisar');
+publicar('99.0.4', n => n);
+
 // 11. GH_REF: fijar una versión anterior
 const V0 = fs.mkdtempSync(path.join(os.tmpdir(), 'vieja-')) + '/'; for (const f of fs.readdirSync(ROOT + 'dist')) fs.copyFileSync(ROOT + 'dist/' + f, V0 + f);
 srv.gh.refs = { 'vieja': V0 }; P().setProperty('GH_REF', 'vieja'); pasan5min();

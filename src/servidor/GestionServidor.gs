@@ -873,3 +873,15 @@ function api_g_extraSave(tok, list) {
     return { ok: true, n: out.length, extra: out.map(function (r) { return { code: r[0], ubic: r[1], fecha: r[2], valor: Number(r[3]) || 0, serie: r[4], obs: r[5], por: r[6], t: r[7] }; }) };
   });
 }
+
+/* ================= ACTUALIZACIÓN INMEDIATA ================= */
+/**
+ * Las pantallas lo llaman al abrir, al volver a la pestaña y cada 3 min: obliga al cargador a revisar GitHub ahora
+ * (en vez de esperar sus 5 min). Como mucho una revisión forzada cada 30 s para todo el sistema. No necesita sesión.
+ */
+function api_sys_revisar() {
+  var c = CacheService.getScriptCache();
+  try { if (!c.get('INV1_frc')) { c.put('INV1_frc', '1', 30); c.remove('INV1_chk'); } } catch (e) {}
+  var v = null; try { v = typeof version_ === 'function' ? version_() : null; } catch (e) {}
+  return { version: v ? v.v : NUCLEO_VERSION, fecha: v ? v.fecha : '' };
+}
