@@ -33,7 +33,7 @@ async function api(fn, ...a) {
 }
 function toast(msg, bad) { const t = $('#toast'); t.textContent = msg; t.className = 'toast' + (bad ? ' bad' : ''); t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, bad ? 6000 : 3200); }
 function modal(html) { $('#modalBox').innerHTML = html; $('#modal').hidden = false; }
-function closeModal() { $('#modal').hidden = true; $('#modalBox').innerHTML = ''; }
+function closeModal() { $('#modal').hidden = true; $('#modalBox').innerHTML = ''; $('#modalBox').className = 'box'; }
 $('#modal').addEventListener('click', e => { if (e.target.id === 'modal' || e.target.closest('[data-close]')) closeModal(); });
 function loadScript(url) { return new Promise((res, rej) => { if ($$('script').some(s => s.src === url)) return res(); const s = document.createElement('script'); s.src = url; s.onload = res; s.onerror = () => rej(new Error('No se pudo cargar ' + url)); document.head.appendChild(s); }); }
 
@@ -201,6 +201,19 @@ const kChip = (x, r) => { const c = CK[x.k]; let t = `<span class="chip ${c[2]}"
   if (x.k === 'rec' && x.nw) t += ` <span class="chip new" title="${x.nw} con código nuevo">+${x.nw} ✚</span>`;
   if (x.k === 'reet') t += ` <span class="hint">${x.rc ? '↺' : '✚'}</span>`;
   return t; };
+const CGRP_TIPO = [[/oficina|administ/i, 'Oficinas'], [/bodega/i, 'Bodegas'], [/laborat|taller|c[oó]mputo/i, 'Laboratorios y talleres'], [/[aá]rea com|servic/i, 'Áreas comunes'], [/aula/i, 'Otras aulas'], [/sede/i, 'Otra sede']];
+function cGrupoDe(n) { const l = X.loc[norm(n)]; if (!l) return 'fuera'; if (String(l.z || '').trim()) return 'z:' + norm(l.z); const m = CGRP_TIPO.find(x => x[0].test(l.t || '')); return 't:' + (m ? m[1] : 'Otras'); }
+function cGrupos() {
+  if (cGrupos.R === R) return cGrupos.v;
+  const m = new Map();
+  const add = (k, n, loc) => { if (!m.has(k)) m.set(k, { k, n, locs: [], rows: [] }); const g = m.get(k); g.locs.push(loc); g.rows.push(...loc.rows); };
+  D.locs.forEach(l => { const k = cGrupoDe(l.n); add(k, k.slice(2) === norm(l.z || '') && k[0] === 'z' ? String(l.z).trim() : k.slice(2), { n: l.n, t: l.t, l, rows: X.byU[norm(l.n)] || [] }); });
+  R.logical.filter(r => r.C && !X.loc[norm(r.C)]).map(r => r.C).filter((v, i, a) => a.indexOf(v) === i)
+    .forEach(n => add('fuera', 'Fuera de la lista', { n, t: 'No está en la lista de ubicaciones', l: null, rows: R.logical.filter(r => norm(r.C) === norm(n)) }));
+  const orden = k => k[0] === 'z' ? 0 : k === 'fuera' ? 3 : /Otras$/.test(k) ? 2 : 1;
+  cGrupos.v = [...m.values()].sort((a, b) => orden(a.k) - orden(b.k) || (orden(a.k) === 0 ? a.n.localeCompare(b.n, 'es') : 0));
+  cGrupos.R = R; return cGrupos.v;
+}
 MODS.conteo = {
   base() { const s = UI.conteo; return R.logical.filter(r => !s.u || norm(r.C) === norm(s.u)); },
   list() {
@@ -214,23 +227,24 @@ MODS.conteo = {
     const cnt = { cons: [0, 0], rec: [0, 0], nw: [0, 0], reet: [0, 0], alerta: [0, 0] }; let bienes = 0, co = 0, cr = 0, cn = 0;
     B.forEach(r => { const x = K.get(r); cnt[x.k][0]++; cnt[x.k][1] += x.L; bienes += x.L; co += x.o; cr += x.rc; cn += x.nw; });
     const kp = (k, big, lbl, sub) => `<button type="button" class="ckp${k ? ' k-' + k : ''}${(s.f || '') === k ? ' on' : ''}" data-act="cK" data-k="${k}"><b>${fmtN(big)}</b><span>${lbl}</span><small>${sub}</small></button>`;
-    return `<div class="lstrip" id="cLocs">${this.locs()}</div>
+    return `<div class="card cgrp" id="cLocs">${this.locs()}</div>
     <div class="card cbar"><div class="row">
       <div class="ctit"><b>${s.u ? esc(s.u) : 'Todas las ubicaciones'}</b>${loc ? (loc.t ? ` <span class="hint">· ${esc(loc.t)}</span>` : '') + ' ' + estChip(loc) : ''}</div>
       <span class="hint">${fmtN(B.length)} registros · ${fmtN(bienes)} bienes</span><span style="flex:1"></span>
-      <input type="search" data-in="cQ" value="${esc(s.q)}" placeholder="🔎 Bien, etiqueta, serie, código…" style="min-width:240px;flex:0 1 320px">
+      <input type="search" data-in="cQ" value="${esc(s.q)}" placeholder="🔎 Bien, etiqueta, serie, código…" style="min-width:240px;flex:0 1 340px">
       <div class="seg"><button type="button" data-act="cV" data-v="tabla" class="${v === 'tabla' ? 'on' : ''}">☰ Tabla</button><button type="button" data-act="cV" data-v="tablero" class="${v === 'tablero' ? 'on' : ''}">▦ Tablero</button></div></div>
       <div class="ckps">${kp('', bienes, 'Todos', fmtN(B.length) + ' registros')}${kp('cons', co, '🔒 Conservan', cnt.cons[0] + ' registros')}${kp('rec', cr, '↺ Reciclan', cnt.rec[0] + ' registros')}${kp('nw', cn, '✚ Nuevos', cnt.nw[0] + ' registros')}${kp('reet', cnt.reet[1], '⇄ Re-etiquetar', cnt.reet[0] + ' registros')}${kp('alerta', cnt.alerta[0], '⚠ Revisar', 'registros')}</div></div>
-    <div class="grid g-main"><div id="cTable">${v === 'tablero' ? this.board(L) : this.table(L)}</div><div class="card det" id="cDet">${sel ? this.detail(sel) : '<div class="hint">Toque un registro para ver por qué recibe esos códigos.</div>'}</div></div>`;
+    <div id="cTable">${v === 'tablero' ? this.board(L) : this.table(L)}</div>`;
   },
   locs() {
-    const s = UI.conteo, K = cKinds();
-    const pill = (n, t, rows, l) => { const al = rows.filter(r => K.get(r).k === 'alerta').length, e = l ? X.estado(l) : 'fuera';
-      return `<button type="button" class="lpill e-${e}${norm(s.u) === norm(n) ? ' on' : ''}" data-act="cLoc" data-u="${esc(n)}" title="${esc(t || '')}"><b>${esc(n || 'Todas')}</b><small>${fmtN(sumL(rows))} bienes${al ? ` · <em>⚠ ${al}</em>` : ''}</small></button>`; };
-    const extra = R.logical.filter(r => r.C && !X.loc[norm(r.C)]).map(r => r.C).filter((v, i, a) => a.indexOf(v) === i);
-    return pill('', 'Todas las ubicaciones', R.logical, { cerrada: 0 })
-      + D.locs.map(l => pill(l.n, l.t, X.byU[norm(l.n)] || [], l)).join('')
-      + extra.map(n => pill(n, 'No está en la lista de ubicaciones', R.logical.filter(r => norm(r.C) === norm(n)), null)).join('');
+    const s = UI.conteo, K = cKinds(), G = cGrupos(), g = (s.g != null && s.gU === s.u) ? s.g : (s.u ? cGrupoDe(s.u) : '');
+    const al = rows => rows.filter(r => K.get(r).k === 'alerta').length;
+    const tab = (k, n, rows) => { const a = al(rows); return `<button type="button" class="gt${g === k ? ' on' : ''}" data-act="cG" data-g="${esc(k)}">${esc(n)} <small>${fmtN(sumL(rows))}</small>${a ? ` <em>⚠ ${a}</em>` : ''}</button>`; };
+    const pill = (n, t, rows, l) => { const a = al(rows), e = l ? X.estado(l) : 'fuera';
+      return `<button type="button" class="lpill e-${e}${norm(s.u) === norm(n) ? ' on' : ''}" data-act="cLoc" data-u="${esc(n)}" title="${esc(t || '')}"><b>${esc(n)}</b><small>${fmtN(sumL(rows))} bienes${a ? ` · <em>⚠ ${a}</em>` : ''}</small></button>`; };
+    const grp = G.find(x => x.k === g);
+    return `<div class="gtabs"><button type="button" class="gt${g === '' ? ' on' : ''}" data-act="cLoc" data-u="" data-g="">Todas <small>${fmtN(sumL(R.logical))}</small>${al(R.logical) ? ` <em>⚠ ${al(R.logical)}</em>` : ''}</button>${G.map(x => tab(x.k, x.n, x.rows)).join('')}</div>
+      ${grp ? `<div class="lpills">${grp.locs.map(x => pill(x.n, x.t, x.rows, x.l)).join('')}</div>` : '<div class="hint">Elija un edificio o tipo para ver sus ubicaciones. Ahora ve <b>todas</b>.</div>'}`;
   },
   table(L) {
     const s = UI.conteo, K = cKinds(), todas = !s.u;
@@ -256,6 +270,23 @@ MODS.conteo = {
       return `<div class="ccol k-${k}"><h4>${t}<b>${fmtN(b)}</b></h4>${a.slice(0, lim).map(it).join('') || '<div class="hint" style="padding:6px">—</div>'}${a.length > lim ? `<button class="btn sm" data-act="cMore" type="button">+${a.length - lim} más</button>` : ''}</div>`; };
     if (!L.length) return '<div class="card empty">Sin registros con ese filtro.</div>';
     return `<div class="cboard">${col('cons', '🔒 Conservan su etiqueta')}${col('rec', '↺ Reciclan un código')}${col('nw', '✚ Códigos nuevos')}${col('alerta', '⚠ Revisar')}</div>`;
+  },
+  ventana(r) {
+    const s = UI.conteo, x = cKinds().get(r), g = X.reg[r.id] || {}, cs = x.cs, fotos = g.fotos || [], t = s.tab || 'why';
+    const L = this.list(), i = L.findIndex(y => y.ROW === r.ROW), nom = esc(String(r.G).replace(/^🔒\s*/, '').replace(/^\d{4} - /, ''));
+    const tabs = [['why', 'Por qué'], ['datos', 'Datos del registro'], ['fotos', `Fotos (${fotos.length})`], ['cod', `Códigos (${cs.length})`]];
+    const datos = `<dl class="cdl"><dt>Ubicación</dt><dd>${esc(r.C)} ${estChip(X.loc[norm(r.C)])}</dd><dt>Escrito en la app</dt><dd>${esc(r.F)}</dd><dt>Etiqueta física</dt><dd class="code">${r.E ? esc(r.E) : '<span class="hint">sin etiqueta</span>'}</dd>
+      <dt>Código asignado</dt><dd class="code">${codTxt(r)}</dd><dt>Cantidad</dt><dd>${r.L} (B ${N0(r.I)} · R ${N0(r.J)} · M ${N0(r.K)})</dd><dt>Institución-bloque</dt><dd class="code">${esc(r.W + '-' + r.X)}</dd>${r.P ? `<dt>Marca / serie</dt><dd>${esc(r.P)}</dd>` : ''}${r.Q ? `<dt>Observación</dt><dd>${esc(r.Q)}</dd>` : ''}
+      <dt>Contado por</dt><dd>${esc(r.U)} · ${esc(dmy(r.fecha))}</dd></dl>`;
+    const why = `${r.V ? `<div class="banner ${/^ℹ/.test(r.V) ? 'in' : ALERT_BAD.test(r.V) ? 'bad' : 'wa'}">${esc(r.V)}</div>` : ''}<div class="why"><b>Por qué estos códigos</b><ol>${explain(r, cs).map(w => `<li>${w}</li>`).join('')}</ol></div>`;
+    const ft = fotos.length ? `<div class="cfotos">${fotos.map(f => `<figure><img data-fid="${esc(f.id)}" alt="Cargando…"><figcaption>${esc(f.t || f.n || 'Foto')} · <a href="https://drive.google.com/file/d/${esc(f.id)}/view" target="_blank" rel="noopener">abrir en Drive</a></figcaption></figure>`).join('')}</div>` : '<div class="empty">Este registro no tiene fotos.</div>';
+    const cod = cs.length ? `<div class="codes">${cs.map(c => `<span class="${c.R === 'Conservado' ? 'c' : c.R === 'Reciclado' ? 'r' : 'nw'}" title="${esc(c.R + ' · ' + c.F)} · clic: ficha" data-act="cFcod" data-i="${c.n - 1}" style="cursor:pointer">${esc(c.B)}</span>`).join('')}</div><div class="legend" style="margin-top:8px"><span><i style="background:var(--okb)"></i>conservado</span><span><i style="background:var(--inb)"></i>reciclado</span><span><i style="background:#FCE7CF"></i>nuevo</span></div>` : '<div class="empty">Este registro no recibe códigos.</div>';
+    const body = t === 'datos' ? datos : t === 'fotos' ? ft : t === 'cod' ? cod : `<div class="cwhy2"><div style="display:flex;flex-direction:column;gap:10px;min-width:0">${why}</div><div>${datos}</div></div>`;
+    return `<div class="mh"><h2>${nom}</h2>${kChip(x, r)}<span class="hint">registro #${r.A}${i >= 0 ? ` · ${i + 1} de ${fmtN(L.length)}` : ''} · ${esc(r.C)}</span><button class="btn sm ghost x" data-close type="button" title="Cerrar (Esc)">✕</button></div>
+      <div class="mtabs">${tabs.map(([k, n]) => `<button type="button" data-act="cTab" data-t="${k}" class="${t === k ? 'on' : ''}">${n}</button>`).join('')}</div>
+      <div class="mbody">${body}</div>
+      <div class="acts" style="justify-content:space-between"><div class="row">${fotos.length ? '<button class="btn" data-act="cTab" data-t="fotos" type="button">📷 Ver fotos (' + fotos.length + ')</button>' : ''}${cs.length ? `<button class="btn" data-act="cFcod" data-i="${cs[0].n - 1}" type="button">🏷 Ficha del código</button>` : ''}</div>
+        <div class="row"><button class="btn" data-act="cNav" data-d="-1" type="button"${i <= 0 ? ' disabled' : ''}>◀ Anterior</button><button class="btn" data-act="cNav" data-d="1" type="button"${i < 0 || i >= L.length - 1 ? ' disabled' : ''}>Siguiente ▶</button><a class="btn pri" href="${esc(CAP_URL)}" target="_top">📱 Corregir en la app</a></div></div>`;
   },
   detail(r) {
     const g = X.reg[r.id] || {}, cs = R.cod.filter(c => c.row === r), n = r.W + '-' + r.X;
@@ -297,15 +328,34 @@ function explain(r, cs) {
   } else out.push(`Modo sin reciclar: se numera después del último correlativo del bloque (<span class="mono">${Motor.util.pad4(r.AC)}</span>).`);
   return out;
 }
-ACT.cSel = b => { UI.conteo.sel = +b.dataset.row; $$('#cTable .sel').forEach(t => t.classList.remove('sel')); b.classList.add('sel'); const r = R.logical.find(x => x.ROW === UI.conteo.sel); $('#cDet').innerHTML = MODS.conteo.detail(r); if (innerWidth < 1100) $('#cDet').scrollIntoView({ behavior: 'smooth' }); };
+ACT.cSel = b => { cAbrir(+b.dataset.row); };
+ACT.cG = b => { UI.conteo.g = b.dataset.g; UI.conteo.gU = UI.conteo.u; render(); };
+ACT.cFcod = b => { closeModal(); ACT.fcod(b); };
+function cAbrir(row, tab) {
+  const s = UI.conteo; s.sel = row; s.tab = tab || s.tab || 'why';
+  const r = R.logical.find(x => x.ROW === row); if (!r) return;
+  $$('#cTable .sel').forEach(t => t.classList.remove('sel')); const el = $(`#cTable [data-row="${row}"]`); if (el) el.classList.add('sel');
+  modal(MODS.conteo.ventana(r)); $('#modalBox').className = 'box cmod';
+  if (s.tab === 'fotos') cFotos(r);
+}
+function cFotos(r) {
+  const g = X.reg[r.id] || {};
+  (g.fotos || []).forEach(async f => {
+    if (FOTO[f.id] === undefined) { try { FOTO[f.id] = await api('api_g_foto', f.id); } catch (e) { FOTO[f.id] = null; } }
+    const im = document.querySelector(`#modalBox img[data-fid="${CSS.escape(f.id)}"]`); if (im) { if (FOTO[f.id]) im.src = FOTO[f.id]; else im.alt = 'No se pudo cargar'; }
+  });
+}
+ACT.cTab = b => cAbrir(UI.conteo.sel, b.dataset.t);
+ACT.cNav = b => { const L = MODS.conteo.list(), i = L.findIndex(r => r.ROW === UI.conteo.sel), j = i + (+b.dataset.d); if (j >= 0 && j < L.length) cAbrir(L[j].ROW); };
+document.addEventListener('keydown', e => { const m = $('#modalBox'); if ($('#modal').hidden || !m || !m.classList.contains('cmod') || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName || '')) return; if (e.key === 'ArrowLeft') ACT.cNav({ dataset: { d: -1 } }); if (e.key === 'ArrowRight') ACT.cNav({ dataset: { d: 1 } }); });
 ACT.cK = b => { UI.conteo.f = b.dataset.k; UI.conteo.lim = 300; render(); };
 ACT.cV = b => { UI.conteo.v = b.dataset.v; LS.set('cview', b.dataset.v); render(); };
-ACT.cLoc = b => { UI.conteo.u = b.dataset.u; UI.conteo.sel = null; UI.conteo.lim = 300; render(); };
+ACT.cLoc = b => { if (b.dataset.g != null) UI.conteo.g = b.dataset.g; UI.conteo.gU = b.dataset.u; UI.conteo.u = b.dataset.u; UI.conteo.sel = null; UI.conteo.lim = 300; render(); };
 ACT.cMore = () => { UI.conteo.lim += 300; const L = MODS.conteo.list(); $('#cTable').innerHTML = cVista() === 'tablero' ? MODS.conteo.board(L) : MODS.conteo.table(L); };
 INP.cU = el => { UI.conteo.u = el.value; UI.conteo.sel = null; UI.conteo.lim = 300; render(); };
 INP.cF = el => { UI.conteo.f = el.value; UI.conteo.lim = 300; render(); };
 INP.cQ = debounce(el => { UI.conteo.q = el.value; UI.conteo.lim = 300; const L = MODS.conteo.list(); $('#cTable').innerHTML = cVista() === 'tablero' ? MODS.conteo.board(L) : MODS.conteo.table(L); }, 220);
-MODS.conteo.after = () => { const p = $('#cLocs .lpill.on'); if (p) p.scrollIntoView({ block: 'nearest', inline: 'center' }); if (UI.conteo.sel != null) { const tr = $(`#cTable [data-row="${UI.conteo.sel}"]`); if (tr) tr.scrollIntoView({ block: 'center' }); } };
+MODS.conteo.after = () => { if (UI.conteo.sel != null) { const tr = $(`#cTable [data-row="${UI.conteo.sel}"]`); if (tr) tr.scrollIntoView({ block: 'center' }); } };
 
 /* ===================== CÓDIGOS ASIGNADOS ===================== */
 MODS.codigos = {

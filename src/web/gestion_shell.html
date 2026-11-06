@@ -285,6 +285,31 @@ table.ct td{vertical-align:middle}.cblk{font-family:'IBM Plex Mono',monospace;fo
 .cit .h{display:flex;gap:6px;align-items:baseline}.cit .h b{font-size:13px;min-width:0}.cit .h .q{margin-left:auto;font-weight:800;font-family:'IBM Plex Mono',monospace}
 .cit .code{font-size:11.5px}
 @media (max-width:1100px){.cboard{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* Conteo v8.2: más aire, grupos de ubicaciones y ventana del registro */
+.main{padding:28px 36px 44px;gap:22px}
+.cgrp{display:flex;flex-direction:column;gap:14px;padding:18px 20px}
+.gtabs{display:flex;gap:8px;flex-wrap:wrap}
+.gt{border:1px solid var(--ln);background:var(--sf);border-radius:999px;padding:7px 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;color:var(--fg)}
+.gt small{color:var(--mu);font-weight:500;margin-left:3px}.gt em{font-style:normal;color:var(--bad);font-size:11.5px;margin-left:3px}
+.gt:hover{background:#FBF6EA}.gt.on{background:var(--navy);color:#fff;border-color:var(--navy)}.gt.on small{color:#C9D3E3}.gt.on em{color:#FFB3B3}
+.lpills{display:flex;gap:9px;flex-wrap:wrap}
+.lpills .lpill{min-width:96px;padding:8px 13px 9px}
+.cbar{padding:20px 22px;gap:16px;display:flex;flex-direction:column}
+.ckps{gap:12px}.ckp{padding:11px 14px}
+table.ct td{padding:13px 14px}table.ct th{padding:11px 14px}
+.cboard{gap:14px}.ccol{padding:10px;gap:9px}.cit{padding:9px 11px}
+.modal .box.cmod{max-width:940px;padding:24px 26px;gap:16px}
+.cmod .mh{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.cmod .mh h2{font-size:21px}.cmod .mh .x{margin-left:auto}
+.mtabs{display:flex;gap:2px;border-bottom:1px solid var(--ln);flex-wrap:wrap}
+.mtabs button{border:0;background:none;padding:9px 14px;font:inherit;font-size:13.5px;font-weight:600;color:var(--mu);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.mtabs button.on{color:var(--fg);border-bottom-color:var(--ac)}
+.mbody{min-height:220px}
+.cwhy2{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:760px){.cwhy2{grid-template-columns:1fr}}
+.cdl{display:grid;grid-template-columns:max-content 1fr;gap:6px 14px;margin:0;font-size:13.5px}.cdl dt{color:var(--mu)}.cdl dd{margin:0}
+.cfotos{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+.cfotos figure{margin:0;background:var(--sf2);border-radius:12px;overflow:hidden}.cfotos img{display:block;width:100%;height:240px;object-fit:contain;background:#E9E5DA}
+.cfotos figcaption{font-size:12px;padding:6px 10px;color:var(--mu)}
 </style>
 <style id="pageStyle">@page{size:letter;margin:12mm}</style>
 </head>
