@@ -1,7 +1,7 @@
 /* ===================== CONFIGURACIÓN ===================== */
 const CFG_TABS = { importar: 'Importar del Excel v10', general: 'General', reglas: 'Reglas de códigos', extracod: 'Códigos después del corte', familia: 'Corrección de familia', eq: 'Equivalencias', textos: 'Textos del acta', sistema: 'Sistema' };
 let SYS = null;
-let IMP = null, EQED = null, RCED = null, EXF = { code: '', ubic: '', fecha: '', valor: '', serie: '', obs: '' };
+let IMP = null, EQED = null, RCED = null, EXF = { code: '', ubic: '', fecha: '', valor: '', serie: '', obs: '' }, EXI = -1;
 MODS.config = {
   html() {
     const k = UI.cfg, ro = !isAdmin();
@@ -79,17 +79,17 @@ MODS.config = {
     const chk = extraCheck(f.code), locs = D.locs.map(l => `<option value="${esc(l.n)}"${norm(f.ubic) === norm(l.n) ? ' selected' : ''}>${esc(l.n)}${l.t ? ' · ' + esc(l.t) : ''}</option>`).join('');
     return `<div class="card cfgsec"><h2>Códigos registrados después del corte <span class="meta">${L.length} agregado(s)</span></h2>
       <p class="hint" style="margin:0">Códigos que <b>sí están en SIGES</b> pero no venían en el inventario anterior porque se registraron después de la fecha en que se imprimió. Se <b>conservan</b> solo si cumplen las reglas (institución, bloque del catálogo) y el bien se cuenta <b>con esa etiqueta en la ubicación indicada</b>. Mientras no aparezca, el código queda reservado (nadie más lo recibe).</p>
-      ${ro ? '' : `<div class="exform">
+      ${ro ? '' : `${EXI >= 0 ? `<div class="banner in">Editando <b class="mono">${esc((BASE.extra[EXI] || {}).code || '')}</b>. Cambie lo que necesite y toque <b>Guardar cambios</b>.</div>` : ''}<div class="exform${EXI >= 0 ? ' editing' : ''}">
         <div class="field"><span class="lbl">Código</span><input type="text" class="mono" data-in="exCode" value="${esc(f.code)}" placeholder="11674-1103-0016" maxlength="15" autocomplete="off"><span class="hint" id="exChk">${chk.html}</span></div>
         <div class="field"><span class="lbl">Ubicación donde está</span><select data-ch="exUbic"><option value="">— elegir —</option>${locs}</select></div>
         <div class="field"><span class="lbl">Fecha de adquisición</span><input type="date" data-ch="exFecha" value="${esc(f.fecha)}"></div>
         <div class="field"><span class="lbl">Valor ($)</span><input type="number" step="0.01" min="0" data-ch="exValor" value="${esc(f.valor)}" placeholder="0.00"></div>
         <div class="field"><span class="lbl">Serie (opcional)</span><input type="text" data-ch="exSerie" value="${esc(f.serie)}"></div>
         <div class="field" style="grid-column:span 2"><span class="lbl">Observación (opcional)</span><input type="text" data-ch="exObs" value="${esc(f.obs)}" placeholder="Ej.: registrado en SIGES el 20/10/2026"></div>
-        <div class="field" style="align-self:end"><button class="btn pri" data-act="exAdd" type="button">+ Agregar código</button></div></div>`}
+        <div class="field" style="align-self:end">${EXI >= 0 ? '<div class="row" style="gap:8px;flex-wrap:nowrap"><button class="btn" data-act="exCancel" type="button">Cancelar</button><button class="btn pri" data-act="exAdd" type="button" style="flex:1">✔ Guardar cambios</button></div>' : '<button class="btn pri" data-act="exAdd" type="button">+ Agregar código</button>'}</div></div>`}
       ${L.length ? `<div class="tw"><table class="t"><thead><tr><th>Código</th><th>Bien</th><th>Ubicación donde está</th><th>Adquisición</th><th class="n">Valor</th><th>Qué pasa en el conteo</th><th></th></tr></thead><tbody>
         ${L.map((x, i) => { const e = extraEstado(x); return `<tr><td class="code">${esc(x.code)}</td><td>${esc(R.catDesc(x.code.slice(6, 10)) || x.code.slice(6, 10))}${x.serie ? `<div class="hint">S/N ${esc(x.serie)}</div>` : ''}${x.obs ? `<div class="hint">${esc(x.obs)}</div>` : ''}</td><td>${esc(x.ubic)}</td><td>${x.fecha ? esc(dmy(x.fecha)) : '<span class="hint">—</span>'}</td><td class="n">${x.valor ? money(x.valor) : ''}</td><td>${e}</td>
-          <td>${ro ? '' : `<button class="btn sm ghost" data-act="exDel" data-i="${i}" type="button" title="Quitar de la lista">🗑</button>`}</td></tr>`; }).join('')}</tbody></table></div>` : '<div class="hint">Todavía no hay códigos agregados.</div>'}</div>`;
+          <td style="white-space:nowrap">${ro ? '' : `<button class="btn sm ghost" data-act="exEdit" data-i="${i}" type="button" title="Editar">✏</button><button class="btn sm ghost" data-act="exDel" data-i="${i}" type="button" title="Quitar de la lista">🗑</button>`}</td></tr>`; }).join('')}</tbody></table></div>` : '<div class="hint">Todavía no hay códigos agregados.</div>'}</div>`;
   },
   familia() {
     if (!RCED) RCED = (BASE.rc || []).map(p => [p[0], p[1], '']);
@@ -244,7 +244,7 @@ function extraCheck(code) {
   if (!insts.includes(c.slice(0, 5))) return { ok: false, html: `<span style="color:var(--bad)">La institución ${c.slice(0, 5)} no está en Configuración › General</span>` };
   const d = R.catDesc(c.slice(6, 10)); if (!d) return { ok: false, html: `<span style="color:var(--bad)">El bloque ${c.slice(6, 10)} no está en el catálogo</span>` };
   if ((BASE.inv || []).some(o => o.code.toUpperCase() === c)) return { ok: false, html: '<span style="color:var(--wa)">Ya está en el inventario anterior: no hace falta agregarlo</span>' };
-  if ((BASE.extra || []).some(o => o.code === c)) return { ok: false, html: '<span style="color:var(--wa)">Ya está en esta lista</span>' };
+  if ((BASE.extra || []).some((o, i) => o.code === c && i !== EXI)) return { ok: false, html: '<span style="color:var(--wa)">Ya está en esta lista</span>' };
   const rc = (BASE.rc || []).find(p => p[0] === c.slice(6, 10));
   return { ok: true, html: `<span style="color:var(--ok)">✓ ${esc(d)}</span>${rc ? ` <span style="color:var(--wa)">· ojo: el bloque ${rc[0]} está en corrección de familia → ${rc[1]}</span>` : ''}` };
 }
@@ -267,9 +267,17 @@ ACT.exAdd = async b => {
   const ck = extraCheck(EXF.code); if (!ck.ok) { toast(ck.html.replace(/<[^>]+>/g, ''), true); return; }
   if (!EXF.ubic) { toast('Elija la ubicación donde está el bien', true); return; }
   b.disabled = true;
-  try { const c = EXF.code.trim().toUpperCase(); await extraGuardar((BASE.extra || []).concat([Object.assign({}, EXF, { code: c })]), c + ' agregado: se conserva si se cuenta con su etiqueta en ' + EXF.ubic); EXF = { code: '', ubic: '', fecha: '', valor: '', serie: '', obs: '' }; render(); }
-  catch (e) { toast(errMsg(e), true); b.disabled = false; }
+  try {
+    const c = EXF.code.trim().toUpperCase(), it = Object.assign({}, EXF, { code: c }), L = (BASE.extra || []).slice(), ed = EXI >= 0;
+    if (ed) L[EXI] = it; else L.push(it);
+    await extraGuardar(L, ed ? c + ' actualizado' : c + ' agregado: se conserva si se cuenta con su etiqueta en ' + EXF.ubic);
+    EXF = { code: '', ubic: '', fecha: '', valor: '', serie: '', obs: '' }; EXI = -1; render();
+  } catch (e) { toast(errMsg(e), true); b.disabled = false; }
 };
+ACT.exEdit = b => { const x = (BASE.extra || [])[+b.dataset.i]; if (!x) return; EXI = +b.dataset.i;
+  EXF = { code: x.code, ubic: x.ubic, fecha: x.fecha || '', valor: x.valor ? String(x.valor) : '', serie: x.serie || '', obs: x.obs || '' }; render();
+  const i = $('[data-in="exCode"]'); if (i) { i.scrollIntoView({ block: 'center' }); i.focus(); } };
+ACT.exCancel = () => { EXI = -1; EXF = { code: '', ubic: '', fecha: '', valor: '', serie: '', obs: '' }; render(); };
 ACT.exDel = b => { const x = (BASE.extra || [])[+b.dataset.i]; if (!x) return;
   confirmModal(`¿Quitar ${x.code} de la lista? Si el bien se contó con esa etiqueta, dejará de conservarse y recibirá otro código.`, 'Quitar', async () => {
-    try { await extraGuardar(BASE.extra.filter((y, i) => i !== +b.dataset.i), x.code + ' quitado de la lista'); } catch (e) { toast(errMsg(e), true); } }); };
+    try { EXI = -1; await extraGuardar(BASE.extra.filter((y, i) => i !== +b.dataset.i), x.code + ' quitado de la lista'); } catch (e) { toast(errMsg(e), true); } }); };
