@@ -1,5 +1,5 @@
 /* NÚCLEO DEL SISTEMA DE INVENTARIO · generado por build.py — no editar aquí, editar src/ */
-var NUCLEO_VERSION = '8.3.0';
+var NUCLEO_VERSION = '8.3.1';
 /**
  * CONTEO FÍSICO 2026 · App de captura en Google Sheets + Drive (versión con control de acceso y referencias)
  * Pegue este archivo como Code.gs en Extensiones > Apps Script. El archivo HTML se llama Index.
@@ -323,6 +323,9 @@ function refData_() {
   var inv = rows_(SH.INV, 8).filter(function (r) { return str_(r[0]); }).map(function (r) {
     return [str_(r[0]).trim(), str_(r[1]), str_(r[2]), str_(r[3]), str_(r[4]).trim(), str_(r[5]), str_(r[6]), isFinite(parseFloat(r[7])) ? Number(r[7]) : null];
   });
+  // códigos registrados después del corte (Gestión › Configuración › Reglas de códigos)
+  var catN = {}; cat.forEach(function (c) { catN[c[0]] = c[1]; });
+  extraRows_().forEach(function (x) { inv.push([x.code, (catN[x.code.split('-')[1]] || '') + ' · agregado después del corte', '', '', x.serie, x.fecha, x.ubic, x.valor || null, 1]); });
   return { nombre: get('Institución'), inst: inst, insts: [inst].concat(otros), periodo: get('Período'),
     contadores: [], tipos: col(2), corrFam: corr, cat: cat, inv: inv, ssId: ss_().getId(), fotosUrl: fotosFolder_().getUrl(), appUrl: (function () { try { return ScriptApp.getService().getUrl() || ''; } catch (e) { return ''; } })() };
 }
@@ -341,6 +344,14 @@ function cacheGetBig_(key) {
   for (var j = 0; j < n; j++) { if (parts[keys[j]] == null) return null; s += parts[keys[j]]; }
   try { return JSON.parse(s); } catch (e) { return null; }
 }
+/** Códigos agregados después del corte (hoja G_CODIGOS_AGREGADOS); no crea la hoja si no existe. */
+function extraRows_() {
+  var sh = ss_().getSheetByName('G_CODIGOS_AGREGADOS'); if (!sh || sh.getLastRow() < 2) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues().filter(function (r) { return str_(r[0]).trim(); }).map(function (r) {
+    var f = r[2] instanceof Date ? Utilities.formatDate(r[2], tz_(), 'yyyy-MM-dd') : str_(r[2]).trim();
+    return { code: str_(r[0]).trim().toUpperCase(), ubic: str_(r[1]).trim(), fecha: f, valor: Number(r[3]) || 0, serie: str_(r[4]).trim() };
+  });
+}
 function invIndex_() {
   var key = 'inv' + getKey_('refver'), ix = cacheGetBig_(key);
   if (ix) return ix;
@@ -349,6 +360,7 @@ function invIndex_() {
     var code = norm_(r[0]); if (!code) return; ix.c[code] = 1;
     var se = norm_(r[4]); if (se) ix.s[se] = ix.s[se] ? 'DUP' : code;
   });
+  extraRows_().forEach(function (x) { var code = norm_(x.code); ix.c[code] = 1; var se = norm_(x.serie); if (se) ix.s[se] = ix.s[se] ? 'DUP' : code; });
   var cfg = sh_(SH.CFG).getRange(10, 5, 30, 2).getValues();
   cfg.forEach(function (r) { var a = blk_(r[0]), b = blk_(r[1]); if (a && b) ix.corr.push([a, b]); });
   cachePutBig_(key, ix);
@@ -2239,6 +2251,7 @@ function api_g_extraSave(tok, list) {
     });
     if (errs.length) throw valErr_('No se guardó nada. Revise: ' + errs.slice(0, 8).join(' · ') + (errs.length > 8 ? ' (+' + (errs.length - 8) + ')' : ''));
     gWrite_(GS.EXT, out, ['@', '@', '@', '0.00', '@', '@', '@', '@']);
+    bumpKey_('refver');   // la app de conteo reconoce los códigos agregados
     log_(u, 'Gestión: códigos agregados', '', out.map(function (r) { return r[0] + ' @ ' + r[1]; }).join(' | ').slice(0, 1500), u.dev);
     gBump_();
     return { ok: true, n: out.length, extra: out.map(function (r) { return { code: r[0], ubic: r[1], fecha: r[2], valor: Number(r[3]) || 0, serie: r[4], obs: r[5], por: r[6], t: r[7] }; }) };

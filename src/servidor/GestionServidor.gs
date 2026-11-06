@@ -867,6 +867,7 @@ function api_g_extraSave(tok, list) {
     });
     if (errs.length) throw valErr_('No se guardó nada. Revise: ' + errs.slice(0, 8).join(' · ') + (errs.length > 8 ? ' (+' + (errs.length - 8) + ')' : ''));
     gWrite_(GS.EXT, out, ['@', '@', '@', '0.00', '@', '@', '@', '@']);
+    bumpKey_('refver');   // la app de conteo reconoce los códigos agregados
     log_(u, 'Gestión: códigos agregados', '', out.map(function (r) { return r[0] + ' @ ' + r[1]; }).join(' | ').slice(0, 1500), u.dev);
     gBump_();
     return { ok: true, n: out.length, extra: out.map(function (r) { return { code: r[0], ubic: r[1], fecha: r[2], valor: Number(r[3]) || 0, serie: r[4], obs: r[5], por: r[6], t: r[7] }; }) };

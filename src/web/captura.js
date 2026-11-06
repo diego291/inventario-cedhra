@@ -91,8 +91,8 @@ function loadRef(R){
   $('#catGrid').innerHTML='';
   REF.cat.forEach(([c,d,r,img,def,ras,noc,reg,med,pre,ale])=>{ const x={c,d,r,img,def,ras,noc,reg,med,pre,ale}; CAT.set(c,x); CATL.push({...x,k:norm(c+' '+d+' '+r)}); });
   const serCount=new Map();
-  REF.inv.forEach(([code,desc,marca,modelo,serie,fecha,ub,valor])=>{
-    const rec={code,desc,marca,modelo,serie,fecha,ub,valor,blk:(code.split('-')[1]||'')};
+  REF.inv.forEach(([code,desc,marca,modelo,serie,fecha,ub,valor,extra])=>{
+    const rec={code,desc,marca,modelo,serie,fecha,ub,valor,extra:!!extra,blk:(code.split('-')[1]||'')};
     INV.set(norm(code),rec);
     INVBLK.set(rec.blk,(INVBLK.get(rec.blk)||0)+1);
     if(serie){ const k=norm(serie); serCount.set(k,(serCount.get(k)||0)+1); SER.set(k,rec); }
@@ -365,7 +365,8 @@ function etqVerdict(e, blk){
   if(!blk) return {...base,cls:'info',chip:'Encontrada',txt:'Etiqueta encontrada. Elija el bien según catálogo para validar la familia.'};
   const corr=(REF.corrFam||[]).find(([a,b])=>a===r.blk&&b===blk);
   if(corr) return {...base,cls:'info',chip:'Corrección de familia',txt:`La familia ${r.blk} se corrige a ${blk}: el código viejo va a descargo y el bien se carga en ${blk} con su fecha y valor originales.`};
-  if(r.blk===blk) return {...base,cls:'ok',chip:'Conserva',txt:'🔒 Conserva su código.'};
+  if(r.extra && r.ub && norm(r.ub)!==norm(curUbic())) return {...base,cls:'warn',chip:'Otra ubicación',txt:`Código agregado después del corte: está registrado en ${r.ub}. Solo se conserva si el bien está ahí; si se cambió de lugar, avise al administrador.`};
+  if(r.blk===blk) return {...base,cls:'ok',chip:'Conserva',txt:r.extra?'🔒 Conserva su código (agregado después del corte).':'🔒 Conserva su código.'};
   return {...base,cls:'warn',chip:'Reetiquetar',one:true,txt:`↺ La etiqueta es de otra familia (${r.blk} ${fam?fam.d:''}). Se reetiqueta como ${blk}; el código viejo queda como evidencia y va a descargo.`};
 }
 function oldRecHtml(r, u){
