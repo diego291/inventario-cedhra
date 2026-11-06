@@ -36,7 +36,7 @@ const CG_ERR = { cod: 'Código inválido o sin calcular', dup: 'Código repetido
   fuente: 'Falta la fuente de financiamiento', proy: 'Falta el proyecto (la fuente es PROYECTOS VIGENTES)', est: 'Falta indicar si el valor es estimado', cat: 'Sin categoría SIGES',
   asig: 'Sin "Asignado a" (DUI del responsable)', veh: 'Faltan datos del vehículo (placa, motor, chasis, VIN, color)', desc: 'Descripción de más de 500 caracteres', cal: 'Calidad no reconocida' };
 const CG_WARN = { mms: 'Equipo sin marca, modelo o serie (SIGES lo pide salvo mobiliario y vehículos)', ffor: 'Esa fuente no aparece en el formulario de SIGES: confírmela', exp: 'El código cambió desde la última descarga', sem: 'Animales: revise clasificación y categoría' };
-UI.cargo = { tab: 'lotes', f: 'todos', e: '', q: '', open: {}, lim: 40, inclCarg: false };
+UI.cargo = { tab: 'lotes', f: 'todos', e: '', q: '', open: {}, lim: 40, inclCarg: false, rub: '', blk: '', sel: new Set(), bulk: {}, soloVac: false };
 
 const cgD = () => D.cargo || (D.cargo = { cfg: {}, lote: {}, bien: {} });
 const cgCfg = () => cgD().cfg || {};
@@ -150,7 +150,7 @@ function cgLoteHtml(L) {
   const f = (lbl, html, cls) => `<label class="cgf${cls ? ' ' + cls : ''}"><span>${lbl}</span>${html}</label>`;
   const bad = c => errs.includes(c) ? ' bad' : '';
   let h = `<div class="cglot st-${L.st}" id="cg_${esc(L.key.slice(2))}" data-k="${esc(L.key)}">
-    <div class="cgh"><div class="cgt">${cgChip(L)}<b>${esc(ld.desc || L.descCat)} · ${L.items.length} bien${L.items.length > 1 ? 'es' : ''}</b><small class="code">${esc(cgRange(L))} · ${esc(L.ubic)}</small></div>
+    <div class="cgh"><div class="cgt"><div class="row" style="gap:8px;flex-wrap:nowrap"><input type="checkbox" class="cgck" data-ch="cgSelL" data-k="${esc(L.key)}"${UI.cargo.sel.has(L.key) ? ' checked' : ''}${dis} title="Seleccionar para llenar varios a la vez">${cgChip(L)}</div><b>${esc(ld.desc || L.descCat)} · ${L.items.length} bien${L.items.length > 1 ? 'es' : ''}</b><small class="code">${esc(cgRange(L))} · ${esc(L.ubic)}</small></div>
       ${f('Fecha adquisición', `<input type="date" value="${esc(ld.fecha || '')}" max="${ymdL(new Date())}" data-ch="cgL" data-k="${esc(L.key)}" data-f="fecha"${dis}>`, bad('fecha'))}
       ${f('Valor c/u ($)', `<input type="number" min="0" step="0.01" value="${ld.valor ?? ''}" data-ch="cgL" data-k="${esc(L.key)}" data-f="valor" placeholder="0.00"${dis}>`, bad('valor'))}
       ${f('Forma de adquisición', cgSel(cgList('formas'), ld.forma, `data-ch="cgL" data-k="${esc(L.key)}" data-f="forma"${dis}`), bad('forma'))}
@@ -178,8 +178,39 @@ function cgLoteHtml(L) {
 }
 function cgFiltra(A) {
   const u = UI.cargo, q = norm(u.q);
-  return A.lotes.filter(L => (u.f === 'todos' || (u.f === 'err' ? L.st === 'err' || L.st === 'sin' : L.st === u.f)) && (!u.e || L.chk.some(x => x.e.includes(u.e) || x.w.includes(u.e)))
+  return A.lotes.filter(L => (!u.rub || L.blk.slice(0, 2) === u.rub) && (!u.blk || L.blk === u.blk) && (u.f === 'todos' || (u.f === 'err' ? L.st === 'err' || L.st === 'sin' : L.st === u.f)) && (!u.e || L.chk.some(x => x.e.includes(u.e) || x.w.includes(u.e)))
     && (!q || norm([L.descCat, L.ubic, L.blk, ...L.items.map(i => i.code), (cgD().lote[L.key] || {}).doc].join(' ')).includes(q)));
+}
+/** Barra de familias (rubro) y bloques, como en Conteo. */
+function cgGrupos(A) {
+  const u = UI.cargo, nb = Ls => Ls.reduce((a, L) => a + L.items.length, 0), ne = Ls => Ls.reduce((a, L) => a + L.nErr, 0);
+  const rubs = new Map(); A.lotes.forEach(L => { const r = L.blk.slice(0, 2); if (!rubs.has(r)) rubs.set(r, []); rubs.get(r).push(L); });
+  const tab = (k, n, Ls) => `<button type="button" class="gt${u.rub === k ? ' on' : ''}" data-act="cgRub" data-v="${esc(k)}">${esc(n)} <small>${fmtN(nb(Ls))}</small>${ne(Ls) ? ` <em>⚠ ${fmtN(ne(Ls))}</em>` : ''}</button>`;
+  let h = `<div class="gtabs">${tab('', 'Todas', A.lotes)}${[...rubs.keys()].sort().map(r => tab(r, catRubro(r) || 'Rubro ' + r, rubs.get(r))).join('')}</div>`;
+  if (u.rub) {
+    const blks = new Map(); rubs.get(u.rub)?.forEach(L => { if (!blks.has(L.blk)) blks.set(L.blk, []); blks.get(L.blk).push(L); });
+    h += `<div class="lpills" style="margin-top:10px">${[...blks.keys()].sort().map(b => { const Ls = blks.get(b), e = ne(Ls), carg = Ls.every(L => L.st === 'carg');
+      return `<button type="button" class="lpill ${carg ? 'e-revision' : e ? 'e-proceso' : 'e-cerrada'}${u.blk === b ? ' on' : ''}" data-act="cgBlk" data-v="${esc(b)}"><b>${esc(b)} · ${esc(Ls[0].descCat)}</b><small>${fmtN(nb(Ls))} bienes · ${Ls.length} lote${Ls.length > 1 ? 's' : ''}${e ? ` · <em>⚠ ${fmtN(e)}</em>` : ' · ✔'}</small></button>`; }).join('')}</div>`;
+  }
+  return h;
+}
+/** Barra para llenar varios lotes a la vez con la misma información. */
+function cgBulk() {
+  const u = UI.cargo, n = u.sel.size, b = u.bulk, f = (lbl, html) => `<label class="cgf"><span>${lbl}</span>${html}</label>`;
+  if (!n) return '';
+  return `<div class="cgbulk"><div class="row" style="gap:10px"><b>${fmtN(n)} lote${n > 1 ? 's' : ''} seleccionado${n > 1 ? 's' : ''}</b><span class="hint">Escriba solo lo que quiera aplicar; lo que deje vacío no se toca.</span><span style="flex:1"></span><button class="btn sm" type="button" data-act="cgSelNone">Quitar selección</button></div>
+    <div class="cgbg">${f('Fecha adquisición', `<input type="date" value="${esc(b.fecha || '')}" max="${ymdL(new Date())}" data-ch="cgBk" data-f="fecha">`)}
+      ${f('Valor c/u ($)', `<input type="number" min="0" step="0.01" value="${b.valor ?? ''}" data-ch="cgBk" data-f="valor" placeholder="0.00">`)}
+      ${f('Forma', cgSel(cgList('formas'), b.forma, 'data-ch="cgBk" data-f="forma"', '— no cambiar —'))}
+      ${f('Fuente', cgSel(cgList('fuentes'), b.fuente, 'data-ch="cgBk" data-f="fuente"', '— no cambiar —'))}
+      ${b.fuente === 'PROYECTOS VIGENTES' ? f('Proyecto', cgSel(CG_PROY, b.proy, 'data-ch="cgBk" data-f="proy"', 'Elegir…')) : ''}
+      ${f('¿Valor estimado?', cgSel(cgList('est'), b.est, 'data-ch="cgBk" data-f="est"', '— no cambiar —'))}
+      ${f('N° documento', `<input type="text" maxlength="100" value="${esc(b.doc || '')}" data-ch="cgBk" data-f="doc">`)}
+      ${f('Proveedor', `<input type="text" maxlength="150" value="${esc(b.prov || '')}" data-ch="cgBk" data-f="prov">`)}
+      ${f('Marca', `<input type="text" maxlength="100" value="${esc(b.marca || '')}" data-ch="cgBk" data-f="marca">`)}
+      ${f('Modelo', `<input type="text" maxlength="100" value="${esc(b.modelo || '')}" data-ch="cgBk" data-f="modelo">`)}</div>
+    <div class="row" style="gap:12px;margin-top:10px"><label class="row hint" style="gap:6px"><input type="checkbox" data-ch="cgVac"${u.soloVac ? ' checked' : ''}> Solo llenar donde esté vacío (no reemplazar lo ya escrito)</label><span style="flex:1"></span>
+      <button class="btn pri" type="button" data-act="cgAplicar">Aplicar a ${fmtN(n)} lote${n > 1 ? 's' : ''}</button></div></div>`;
 }
 function cgHead(A) {
   const pend = A.n - A.carg, w = x => pend ? (x / pend * 100).toFixed(1) + '%' : '0%', pl = cgCfg().plantilla;
@@ -197,7 +228,9 @@ MODS.cargo = {
   lotes(A) {
     const u = UI.cargo, L = cgFiltra(A), cnt = f => f === 'todos' ? A.lotes.length : A.lotes.filter(x => f === 'err' ? x.st === 'err' || x.st === 'sin' : x.st === f).length;
     const chips = [['todos', 'Todos'], ['err', 'Con error'], ['sin', 'Sin datos de compra'], ['ok', 'Listos'], ['carg', 'Cargados']].map(([k, t]) => `<button type="button" class="chip ${u.f === k ? 'in' : ''}" style="border:0;cursor:pointer;padding:5px 11px" data-act="cgF" data-v="${k}">${t} ${cnt(k)}</button>`).join('');
-    return `<div class="card" style="padding:12px 14px"><div class="row" style="gap:6px">${chips}${u.e ? `<span class="chip wa">Solo: ${esc(CG_ERR[u.e] || CG_WARN[u.e])} <a href="#" data-act="cgE" data-v="">✕</a></span>` : ''}<span style="flex:1"></span>
+    const sel = L.filter(x => x.st !== 'carg'), todosSel = sel.length && sel.every(x => u.sel.has(x.key));
+    return `<div class="card" style="padding:12px 14px">${cgGrupos(A)}</div>${cgBulk()}<div class="card" style="padding:12px 14px"><div class="row" style="gap:6px">
+      <button class="btn sm" type="button" data-act="cgSelAll"${sel.length ? '' : ' disabled'}>${todosSel ? '☑ Quitar' : '☐ Seleccionar'} los ${fmtN(sel.length)} lotes ${u.blk ? 'de este bloque' : u.rub || u.q || u.f !== 'todos' ? 'filtrados' : ''}</button>${chips}${u.e ? `<span class="chip wa">Solo: ${esc(CG_ERR[u.e] || CG_WARN[u.e])} <a href="#" data-act="cgE" data-v="">✕</a></span>` : ''}<span style="flex:1"></span>
       <input type="search" placeholder="🔎 Bien, ubicación, código, factura…" value="${esc(u.q)}" data-in="cgQ" style="width:250px">
       ${CG_CLIP.d ? `<button class="btn sm" type="button" data-act="cgPasteAll" title="Solo llena los campos vacíos">📥 Pegar en ${L.filter(x => x.st !== 'carg').length} lotes filtrados</button>` : ''}</div>
       <p class="hint" style="margin:8px 2px 0">Cada lote es un registro del conteo (mismo bien, ubicación y captura). Llene una vez los datos de compra; con ▾ ve cada bien para su serie, marca o a quién se asigna. Se guarda solo.</p></div>
@@ -252,6 +285,10 @@ INP.cgL = el => {
 };
 INP.cgB = el => { cgSetB(el.dataset.k, el.dataset.f, el.value.trim()); const lk = 'r:' + el.dataset.k.slice(2).replace(/#\d+$/, ''); cgSoon(lk); };
 INP.cgQ = debounce(el => { UI.cargo.q = el.value; UI.cargo.lim = 40; const A = MODS.cargo.A || cgAll(); $('#cgList').innerHTML = cgFiltra(A).slice(0, UI.cargo.lim).map(cgLoteHtml).join('') || '<div class="card hint">No hay lotes con ese filtro.</div>'; }, 250);
+INP.cgSelL = el => { const s = UI.cargo.sel; if (el.checked) s.add(el.dataset.k); else s.delete(el.dataset.k); cgBulkRefresh(); };
+INP.cgBk = el => { const b = UI.cargo.bulk, f = el.dataset.f; let v = el.value; if (f === 'valor') v = v === '' ? '' : Math.round(Number(v) * 100) / 100; else v = String(v).trim(); if (v === '' || v == null) delete b[f]; else b[f] = v; if (f === 'fuente') { if (v !== 'PROYECTOS VIGENTES') delete b.proy; cgBulkRefresh(); } };
+INP.cgVac = el => { UI.cargo.soloVac = el.checked; };
+function cgBulkRefresh() { const old = $('.cgbulk'), html = cgBulk(); if (old) { if (html) { const t = document.createElement('div'); t.innerHTML = html; old.replaceWith(t.firstElementChild); } else old.remove(); } else if (html) render(); else render(); }
 INP.cgIncl = el => { UI.cargo.inclCarg = el.checked; render(); };
 INP.cgPl = async el => {
   const file = el.files && el.files[0]; if (!file) return;
@@ -266,6 +303,23 @@ INP.cgPl = async el => {
   } catch (e) { setSync('err', 'Plantilla no guardada'); toast(errMsg(e), true); }
 };
 Object.assign(ACT, {
+  cgRub: b => { UI.cargo.rub = b.dataset.v; UI.cargo.blk = ''; UI.cargo.lim = 40; render(); },
+  cgBlk: b => { UI.cargo.blk = UI.cargo.blk === b.dataset.v ? '' : b.dataset.v; UI.cargo.lim = 40; render(); },
+  cgSelAll: () => { const A = MODS.cargo.A || cgAll(), ls = cgFiltra(A).filter(x => x.st !== 'carg'), s = UI.cargo.sel, all = ls.every(x => s.has(x.key)); ls.forEach(x => all ? s.delete(x.key) : s.add(x.key)); render(); },
+  cgSelNone: () => { UI.cargo.sel.clear(); render(); },
+  cgAplicar: () => {
+    const u = UI.cargo, b = Object.assign({}, u.bulk), A = cgAll(), ls = A.lotes.filter(L => u.sel.has(L.key) && L.st !== 'carg');
+    if (b.fuente === 'PROYECTOS VIGENTES' && !b.proy) { toast('Elija el proyecto (la fuente es PROYECTOS VIGENTES)', true); return; }
+    if (b.valor !== undefined && !(b.valor > 0)) { toast('El valor debe ser mayor que 0', true); return; }
+    if (!Object.keys(b).length) { toast('Escriba al menos un dato para aplicar', true); return; }
+    let n = 0;
+    ls.forEach(L => { const cur = cgD().lote[L.key] || {}, d = Object.assign({}, cur); let ch = false;
+      Object.entries(b).forEach(([f, v]) => { if (u.soloVac && cur[f] != null && cur[f] !== '') return; if (d[f] !== v) { d[f] = v; ch = true; } });
+      if (b.fuente && b.fuente !== 'PROYECTOS VIGENTES' && !(u.soloVac && cur.fuente)) delete d.proy;
+      if (ch) { cgPut('lote', L.key, d); n++; } });
+    toast(n ? `Aplicado a ${n} lote(s) · ${fmtN(ls.reduce((a, L) => a + L.items.length, 0))} bienes` : 'Esos lotes ya tenían esa información');
+    u.sel.clear(); u.bulk = {}; render();
+  },
   cgTab: b => { UI.cargo.tab = b.dataset.v; render(); },
   cgF: b => { UI.cargo.f = b.dataset.v; UI.cargo.lim = 40; render(); },
   cgE: b => { UI.cargo.e = b.dataset.v; UI.cargo.f = 'todos'; UI.cargo.tab = 'lotes'; UI.cargo.lim = 40; render(); window.scrollTo({ top: 0 }); },
