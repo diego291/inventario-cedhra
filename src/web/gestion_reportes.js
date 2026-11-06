@@ -61,6 +61,19 @@ function rpRanges(items, cols) {
   });
   return out;
 }
+/* ---------- Diseño A (institucional) compartido por todos los reportes ---------- */
+const RP_W = { 'Desde': '15%', 'Hasta': '15%', 'Código': '15%', 'Cant.': '6%', 'Fecha': '10%', 'Valor': '10%', 'Estado': '10%', 'Etiqueta vieja': '14%', 'Marca/serie': '14%' };
+const rpColg = head => `<colgroup>${head.map(h => `<col${RP_W[h] ? ` style="width:${RP_W[h]}"` : ''}>`).join('')}</colgroup>`;
+const rpSt = v => { const t = String(v ?? '').trim(); return /^(BUENO|REGULAR|MALO)$/i.test(t) ? `<i class="st ${t.toLowerCase()}">${esc(t.toUpperCase())}</i>` : esc(v); };
+const rpMeta = (n, rango, val) => `<span class="mt"><em>${fmtN(n)} cód.</em>${rango ? `<em class="rg">${esc(rango)}</em>` : ''}${val != null ? `<em>${money(val)}</em>` : ''}</span>`;
+/** Encabezado del reporte: institución, título, agrupación, período, fecha, marca PRELIMINAR y cuadros de totales. */
+function rpHead(titulo, por, kpis) {
+  const pre = X.preliminar ? `<div class="pre"><b>PRELIMINAR</b><span>${X.act.length - X.cerradas} ubicaciones sin cerrar</span></div>` : '';
+  return `${X.preliminar ? '<div class="wm">PRELIMINAR</div>' : ''}<div class="rh"><div class="rh1"><div class="inst">${esc(BASE.cfg.nombre || '')}</div><div class="tt">${esc(titulo)}</div>${por ? `<div class="by">Agrupado por ${esc(por.toLowerCase())}</div>` : ''}</div>
+    <div class="rh2"><div><span>Período</span><b>${esc(BASE.cfg.periodo || '')}</b></div><div><span>Fecha</span><b>${today()}</b></div>${pre}</div></div>
+    <div class="kp" style="grid-template-columns:repeat(${kpis.length},1fr)">${kpis.map(([t, v]) => `<div><span>${esc(t)}</span><b>${esc(typeof v === 'number' ? fmtN(v) : v)}</b></div>`).join('')}</div>`;
+}
+const rpFirmas = () => `<table class="f3" style="margin-top:36pt;page-break-inside:avoid"><tr><td><div class="ln">Elaborado por<br>${esc(BASE.cfg.encargado || '')}</div></td><td><div class="ln">Revisado por</div></td><td><div class="ln">Vo. Bo. Dirección<br>${esc(BASE.cfg.director || '')}</div></td></tr></table>`;
 function rpBuild(forPrint) {
   const s = UI.rp, cols = s.cols, L = rpSort(rpItems(s.tipo)), g2 = s.g2 && s.g2 !== s.g1 ? s.g2 : '';
   const grp = new Set([s.g1, g2]);
@@ -77,41 +90,53 @@ function rpBuild(forPrint) {
     const rr = s.det === 'rangos' ? rpRanges(items, cols).map(r => ({ h: `<td class="mono">${esc(r.desde)}</td><td class="mono">${r.hasta === r.desde ? '' : esc(r.hasta)}</td>`, v: vis.map(k => cell(k, r.x, r)), f: [r.desde, r.hasta === r.desde ? '' : r.hasta].concat(vis.map(k => cell(k, r.x, r))) }))
       : items.map(x => ({ h: `<td class="mono">${esc(x.code)}</td>`, v: vis.map(k => cell(k, x)), f: [x.code].concat(vis.map(k => cell(k, x))) }));
     rr.forEach(r => flat.push(labels.concat(r.f)));
-    return rr.map(r => `<tr>${r.h}${r.v.map((v, i) => `<td${num(vis[i]) ? ' class="n"' : ''}>${esc(v)}</td>`).join('')}</tr>`).join('');
+    return rr.map(r => `<tr>${r.h}${r.v.map((v, i) => `<td${num(vis[i]) ? ' class="n"' : ''}>${vis[i] === 'estado' ? rpSt(v) : esc(v)}</td>`).join('')}</tr>`).join('');
   };
   let html = '', gi = 0;
-  const thead = `<thead><tr>${head.map((h, i) => `<th${h === 'Cant.' || h === 'Valor' ? ' class="n"' : ''}>${esc(h)}</th>`).join('')}</tr></thead>`;
+  const thead = rpColg(head) + `<thead><tr>${head.map((h, i) => `<th${h === 'Cant.' || h === 'Valor' ? ' class="n"' : ''}>${esc(h)}</th>`).join('')}</tr></thead>`;
   rpGroups(L, s.g1).forEach(G => {
     const brk = s.hoja && gi++ > 0 ? ' style="page-break-before:always;break-before:page"' : '';
-    if (s.g1) html += `<div class="bh"${brk}><span>${esc(G.l)}${esc(extraUb(s.g1, G))}</span><span>${G.items.length} · ${esc(rangoTxt(G.items))}${withV ? ' · ' + money(sumV(G.items)) : ''}</span></div>`;
+    if (s.g1) html += `<div class="bh"${brk}><span>${esc(G.l)}${esc(extraUb(s.g1, G))}</span>${rpMeta(G.items.length, rangoTxt(G.items), withV ? sumV(G.items) : null)}</div>`;
     if (s.det === 'totales') {
-      if (g2) html += `<table class="det tot2"><tbody>${rpGroups(G.items, g2).map(H => `<tr><td>${esc(H.l)}${esc(extraUb(g2, H))}</td><td class="mono">${esc(rangoTxt(H.items))}</td><td class="n">${H.items.length}</td>${withV ? `<td class="n">${money(sumV(H.items))}</td>` : ''}</tr>`).join('')}</tbody></table>`;
+      if (g2) html += `<table class="det tot2"><tbody>${rpGroups(G.items, g2).map(H => `<tr><td>${esc(H.l)}${esc(extraUb(g2, H))}</td><td class="mono">${esc(rangoTxt(H.items))}</td><td class="n">${fmtN(H.items.length)}</td>${withV ? `<td class="n">${money(sumV(H.items))}</td>` : ''}</tr>`).join('')}</tbody></table>`;
       rpGroups(G.items, g2).forEach(H => flat.push([G.l, H.l, rangoTxt(H.items), H.items.length].concat(withV ? [money(sumV(H.items))] : [])));
     } else {
       let body = '';
       rpGroups(G.items, g2).forEach(H => {
-        if (H.l) body += `<tr class="g2"><td colspan="${nCol}"><span>${esc(H.l)}${esc(extraUb(g2, H))}</span><span>${H.items.length} · ${esc(rangoTxt(H.items))}${withV ? ' · ' + money(sumV(H.items)) : ''}</span></td></tr>`;
+        if (H.l) body += `<tr class="g2"><td colspan="${nCol}"><span>${esc(H.l)}${esc(extraUb(g2, H))}</span>${rpMeta(H.items.length, rangoTxt(H.items), withV ? sumV(H.items) : null)}</td></tr>`;
         body += rowsOf(H.items, [G.l, H.l].filter((x, i) => [s.g1, g2][i]));
       });
       html += `<table class="det">${thead}<tbody>${body}</tbody></table>`;
     }
-    if (s.g1 && s.sub) html += `<div class="sub2"><span>Subtotal ${esc(G.l.split(' · ')[0])}</span><span>${G.items.length}${withV ? ' · ' + money(sumV(G.items)) : ''}</span></div>`;
+    if (s.g1 && s.sub) html += `<div class="sub2"><span>Subtotal ${esc(G.l.split(' · ')[0])}</span>${rpMeta(G.items.length, '', withV ? sumV(G.items) : null)}</div>`;
   });
   const titulo = { cargos: 'REPORTE DE CARGOS (CÓDIGOS NUEVOS)', descargos: 'REPORTE DE DESCARGOS', reciclados: 'CÓDIGOS RECICLADOS (RE-ETIQUETAR)' }[s.tipo];
   const por = [s.g1 && RP_GRUPOS[s.g1], g2 && RP_GRUPOS[g2]].filter(Boolean).join(' ▸ ');
   const res = `${L.length} código(s)${withV ? ' · ' + money(sumV(L)) : ''} · ${new Set(L.map(x => parseCode(x.code).ib || x.blk)).size} bloque(s) · ${new Set(L.map(x => norm(x.ubic))).size} ubicación(es)`;
-  const wm = X.preliminar ? 'PRELIMINAR' : '';
-  const doc = `<section class="doc rep">${wm ? `<div class="wm">${wm}</div>` : ''}<h1>${esc(BASE.cfg.nombre || '')}</h1><div class="sub">${titulo}${por ? ' · ' + esc(por.toUpperCase()) : ''} — ${esc(BASE.cfg.periodo || '')} · ${today()}${wm ? ' · ' + (X.act.length - X.cerradas) + ' ubicaciones sin cerrar' : ''}</div>
-    <div class="res">${esc(res)}</div>${html || '<p>Sin datos con ese filtro.</p>'}<div class="res" style="margin-top:8pt">TOTAL ${esc(res)}</div>
-    ${s.firmas ? `<table class="f3" style="margin-top:36pt;page-break-inside:avoid"><tr><td><div class="ln">Elaborado por<br>${esc(BASE.cfg.encargado || '')}</div></td><td><div class="ln">Revisado por</div></td><td><div class="ln">Vo. Bo. Dirección<br>${esc(BASE.cfg.director || '')}</div></td></tr></table>` : ''}</section>`;
+  const kpis = [['Códigos', L.length]].concat(withV ? [['Valor total', money(sumV(L))]] : []).concat([['Bloques', new Set(L.map(x => parseCode(x.code).ib || x.blk)).size], ['Ubicaciones', new Set(L.map(x => norm(x.ubic))).size]]);
+  const doc = `<section class="doc rep">${rpHead(titulo, por, kpis)}${html || '<p>Sin datos con ese filtro.</p>'}
+    <div class="gt"><span>TOTAL GENERAL</span><span>${fmtN(L.length)} códigos${withV ? ' · ' + money(sumV(L)) : ''}</span></div>${s.firmas ? rpFirmas() : ''}</section>`;
   const xhead = (s.det === 'totales' ? [RP_GRUPOS[s.g1] || 'Grupo', RP_GRUPOS[g2] || '', 'Rango', 'Cantidad'].concat(withV ? ['Valor'] : []) : [s.g1 && RP_GRUPOS[s.g1], g2 && RP_GRUPOS[g2]].filter(Boolean).concat(head));
   return { doc, head: xhead, flat, n: L.length, titulo };
 }
-const REP_CSS = `.doc .bh{background:#1F3864;color:#fff;font-weight:bold;padding:4pt 6pt;margin-top:8pt;display:flex;justify-content:space-between;gap:10pt;font-size:9pt}
-.doc .bh2{background:#E9EDF4;font-weight:bold;padding:2.5pt 6pt;display:flex;justify-content:space-between;gap:10pt;color:#1F3864;font-size:8.5pt;margin-top:3pt}
-.doc .sub2{display:flex;justify-content:space-between;font-weight:bold;background:#F6F7FA;padding:2.5pt 6pt;font-size:8.5pt;border-top:0.8pt solid #1F3864}
-.doc tr.g2 td{background:#E9EDF4;color:#1F3864;font-weight:bold;padding:3pt 5pt}.doc tr.g2 td span:last-child{float:right}
-.doc .det{margin-top:0}`;
+const REP_CSS = `.doc.rep .rh{display:flex;justify-content:space-between;align-items:flex-end;gap:14pt;border-bottom:2pt solid #1F3864;padding-bottom:6pt}
+.doc.rep .rh1{flex:1;min-width:0}.doc.rep .inst{font-size:8pt;letter-spacing:.12em;color:#1F3864;font-weight:bold;text-transform:uppercase}.doc.rep .tt{font-size:16pt;font-weight:bold;color:#1F3864;margin-top:1pt;line-height:1.15}.doc.rep .by{font-size:8.5pt;color:#666}
+.doc.rep .rh2{display:flex;gap:12pt;align-items:flex-end;flex:none}.doc.rep .rh2>div{display:flex;flex-direction:column;font-size:8.5pt}.doc.rep .rh2 span{font-size:6.5pt;color:#777;text-transform:uppercase;letter-spacing:.08em}
+.doc.rep .rh2 .pre{border:1pt solid #C00000;color:#C00000;padding:2pt 6pt;border-radius:3pt}.doc.rep .rh2 .pre span{color:#C00000;text-transform:none;letter-spacing:0;font-size:6.5pt}
+.doc.rep .kp{display:grid;margin:8pt 0 10pt;border:0.8pt solid #C9D2E3;border-radius:4pt;page-break-inside:avoid}.doc.rep .kp div{display:flex;flex-direction:column;padding:5pt 8pt;border-left:0.8pt solid #C9D2E3}.doc.rep .kp div:first-child{border-left:0}
+.doc.rep .kp span{font-size:7pt;text-transform:uppercase;letter-spacing:.06em;color:#5B6578}.doc.rep .kp b{font-size:13pt;color:#1F3864;font-variant-numeric:tabular-nums}
+.doc .bh{background:#1F3864;color:#fff;font-weight:bold;padding:5pt 7pt;margin-top:12pt;display:flex;justify-content:space-between;align-items:center;gap:10pt;font-size:9pt;letter-spacing:.02em;border-radius:3pt 3pt 0 0;page-break-after:avoid;break-after:avoid}
+.doc .mt{display:flex;gap:10pt;white-space:nowrap}.doc .mt em{font-style:normal}.doc .mt em.rg{font-weight:normal;font-size:8pt;opacity:.85}
+.doc.rep .det{table-layout:fixed;margin-top:0}.doc.rep .det th{background:#fff;color:#1F3864;border-bottom:1pt solid #1F3864;font-size:7pt;letter-spacing:.06em;padding:4pt 3pt 3pt}
+.doc.rep .det td{border-bottom:0.4pt solid #E1E5EC;overflow-wrap:anywhere}.doc.rep .det td.n{font-variant-numeric:tabular-nums}
+.doc.rep .det tbody tr:not(.g2):nth-child(even) td{background:#F7F9FC}
+.doc tr.g2 td{background:#E9EDF4;color:#1F3864;font-weight:bold;padding:3pt 5pt;font-size:8.5pt;border-top:0.8pt solid #C9D2E3}.doc tr.g2 td>span:first-child{float:left}.doc tr.g2 td .mt{float:right}
+.doc tr.g2{page-break-after:avoid;break-after:avoid}
+.doc .sub2{display:flex;justify-content:space-between;font-weight:bold;color:#1F3864;padding:4pt 7pt;font-size:8.5pt;border-top:1pt solid #1F3864;page-break-before:avoid}
+.doc.rep .gt{display:flex;justify-content:space-between;font-weight:bold;margin-top:12pt;padding:6pt 8pt;font-size:10pt;background:#1F3864;color:#fff;border-radius:3pt;page-break-inside:avoid}
+.doc.rep h3{font-size:9pt;color:#1F3864;letter-spacing:.06em;margin:12pt 0 0;padding:5pt 7pt;background:#1F3864;color:#fff;border-radius:3pt 3pt 0 0}
+.doc.rep .det.fx{table-layout:auto}.doc.rep .det.fx td{overflow-wrap:normal;font-size:8pt}.doc.rep .f3{table-layout:fixed}.doc.rep .tot2 td{padding:3pt 5pt}.doc.rep .tot2 tr:nth-child(even) td{background:#F7F9FC}
+.doc i.st{font-style:normal;font-size:7pt;font-weight:bold;padding:0.5pt 4pt;border-radius:6pt;white-space:nowrap}.doc i.st.bueno{background:#E3F2E8;color:#1E7B45}.doc i.st.regular{background:#FFF1D6;color:#9A6200}.doc i.st.malo{background:#FBE3E3;color:#B42318}`;
 MODS.reportes = {
   html() {
     const s = UI.rp, fixed = !['cargos', 'descargos', 'reciclados'].includes(s.tipo);
@@ -165,11 +190,10 @@ Object.assign(ACT, {
   rpXls: async b => { b.disabled = true; try { const B = rpBuild(); descarga(await api('api_g_tablas', B.titulo, [{ t: B.titulo.slice(0, 90), head: B.head, rows: B.flat }])); } catch (e) { toast(errMsg(e), true); } b.disabled = false; },
   rFixXls: async b => { b.disabled = true; try { const r = REPS[UI.rp.tipo], [h, rows] = r.det(); descarga(await api('api_g_tablas', r.t, [{ t: r.t.slice(0, 90), head: h, rows }])); } catch (e) { toast(errMsg(e), true); } b.disabled = false; },
   rPrint: () => {
-    const r = REPS[UI.rp.tipo], res = r.res ? r.res() : null, [h, rows] = r.det(), wm = X.preliminar ? 'PRELIMINAR' : '';
-    const t = (hh, rr) => `<table class="det"><thead><tr>${hh.map(x => `<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${rr.map(x => `<tr>${x.map(v => `<td${/^\d{5}-\d{4}/.test(String(v)) ? ' class="mono"' : ''}>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
-    printHTML(`<section class="doc">${wm ? `<div class="wm">${wm}</div>` : ''}<h1>${esc(BASE.cfg.nombre || '')}</h1><div class="sub">${esc(r.t.toUpperCase())} — ${esc(BASE.cfg.periodo || '')} · ${today()}</div>
-      <div class="res">${r.tot().map(([a, v]) => esc(a) + ': ' + esc(typeof v === 'number' ? fmtN(v) : v)).join(' · ')}</div>${res ? `<h3>${esc(res[0])}</h3>${t(res[1], res[2])}` : ''}<h3>DETALLE</h3>${t(h, rows)}
-      <table class="f3" style="margin-top:40pt;page-break-inside:avoid"><tr><td><div class="ln">Elaborado por<br>${esc(BASE.cfg.encargado || '')}</div></td><td><div class="ln">Revisado por</div></td><td><div class="ln">Vo. Bo. Dirección<br>${esc(BASE.cfg.director || '')}</div></td></tr></table></section>`);
+    const r = REPS[UI.rp.tipo], res = r.res ? r.res() : null, [h, rows] = r.det();
+    const t = (hh, rr) => `<table class="det fx"><thead><tr>${hh.map(x => `<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${rr.map(x => `<tr>${x.map(v => `<td${typeof v === 'number' ? ' class="n"' : /^\d{5}-\d{4}/.test(String(v)) ? ' class="mono"' : ''}>${rpSt(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    const pap = UI.actas.papel, hz = pap === 'Oficio' ? '13in 8.5in' : pap === 'A4' ? 'A4 landscape' : 'letter landscape';
+    printHTML(`<style>${REP_CSS}@page{size:${hz};margin:10mm}</style><section class="doc rep">${rpHead(r.t.toUpperCase(), '', r.tot())}${res ? `<h3>${esc(res[0].toUpperCase())}</h3>${t(res[1], res[2])}` : ''}<h3>DETALLE · ${fmtN(rows.length)} FILAS</h3>${t(h, rows)}${rpFirmas()}</section>`);
   },
   rExport: async b => {
     b.disabled = true; $('#rExpMsg').textContent = 'Calculando y escribiendo el archivo… (puede tardar un minuto)';

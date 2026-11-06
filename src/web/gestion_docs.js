@@ -1,5 +1,6 @@
 /* ===================== DOCUMENTOS: fichas, actas, reportes, etiquetas ===================== */
 const DOC_CSS = `
+.doc,.doc *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .doc{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:10pt;line-height:1.35;position:relative;page-break-after:always;break-after:page}
 .doc:last-child{page-break-after:auto;break-after:auto}
 .doc h1{font-size:14pt;color:#1F3864;text-align:center;margin:4pt 0 2pt}
