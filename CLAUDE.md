@@ -1,15 +1,15 @@
 # Reglas para trabajar en este repositorio (Claude)
 
 Usuario: Diego (Complejo Educativo Dr. Humberto Romero Alvergue). Quiere cambios directos, de calidad y que lleguen solos.
-Antes de construir algo visible, Diego pide **imágenes con 3 opciones**; elige y luego se construye.
+Antes de construir algo visible, Diego pide **imágenes con 3 opciones**; elige y luego se construye y se publica directo.
 
 ## Flujo obligatorio para cada cambio
 1. Editar **solo `src/`** (nunca `dist/` a mano).
 2. `python3 build.py X.Y.Z` subiendo la versión (VERSION). Siempre versión nueva, aunque sea un arreglo pequeño.
 3. Pruebas: `node tests/test_loader.js` y, si hay fixtures en `tests/privado/` (Diego los guarda en su Drive como *pruebas_privadas.zip*), las pruebas completas del motor (6 escenarios = Excel v10, 0 diferencias), servidor y navegador.
 4. `python3 tools/verificar.py` debe decir `dist OK`.
-5. Commit + push a la rama **`prueba`**. Avisar a Diego qué revisar en la hoja CONTEO – PRUEBA (llega en ≤ 5 min o con "Buscar actualización ahora").
-6. Cuando Diego aprueba: llevar `prueba` a `main` (fast-forward) y anotar el commit (las etiquetas se crean desde GitHub si se desean; `GH_REF` acepta rama, etiqueta o commit).
+5. Commit + push **directo a `main`** (decisión de Diego, 05/11/2026: no usar la rama `prueba` ni pedir aprobación antes de publicar). Llega solo en ≤ 5 min o con "Buscar actualización ahora".
+6. Si algo sale mal: revertir el commit o fijar `GH_REF` a un commit anterior.
 
 ## Prohibido
 - Subir datos reales: nombres, DUI/NIP, códigos de acceso, inventario, respaldos, Excel. El repositorio es **público**.
