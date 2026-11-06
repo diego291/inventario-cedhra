@@ -12,8 +12,10 @@
  * Volver a una versión anterior sin tocar código:
  *   Configuración del proyecto › Propiedades del script › GH_REF = (etiqueta o commit). Borrarla vuelve a la rama.
  */
-var GH_REPO = 'diego291/invenatrio-cedhra';
+var GH_REPO = 'diego291/inventario-cedhra';
 var GH_RAMA = 'main';            // En la hoja de PRUEBA cambie a 'prueba'.
+var PAGINA_OK = /^https:\/\/diego291\.github\.io\/[A-Za-z0-9._\/-]*$/;   // dirección de GitHub Pages que puede mostrar la app
+var CARGADOR_VERSION = 2;
 
 var REVISAR_CADA = 300;          // segundos entre revisiones de versión nueva
 var PARTE = 45000;               // tamaño de cada trozo en la caché
@@ -23,15 +25,18 @@ var CK = 'INV1_';
 /* ============ Entradas que Google llama por su nombre (no cambian) ============ */
 function doGet(e) {
   var p = (e && e.parameter) || {}, g = 'gestion' in p;
+  // Si se abre desde la página de GitHub, los enlaces internos (Conteo ⇄ Gestión) vuelven a esa página.
+  var base = (p.shell && PAGINA_OK.test(String(p.shell))) ? String(p.shell) : ScriptApp.getService().getUrl();
   try {
-    var html = archivo_(g ? 'gestion' : 'index').replace(/%%APP_URL%%/g, ScriptApp.getService().getUrl());
+    var html = archivo_(g ? 'gestion' : 'index').replace(/%%APP_URL%%/g, base);
     return HtmlService.createHtmlOutput(html)
       .setTitle(g ? 'Gestión de Inventario' : 'Captura de Conteo')
       .addMetaTag('viewport', g ? 'width=device-width, initial-scale=1' : 'width=device-width, initial-scale=1, viewport-fit=cover')
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   } catch (err) {
     return HtmlService.createHtmlOutput('<div style="font-family:sans-serif;padding:24px;max-width:560px"><h2>No se pudo abrir el sistema</h2><p>' +
-      String(err.message || err).replace(/[<>&]/g, '') + '</p><p>Intente de nuevo en unos minutos. Si sigue igual, avise al administrador.</p></div>').setTitle('Inventario');
+      String(err.message || err).replace(/[<>&]/g, '') + '</p><p>Intente de nuevo en unos minutos. Si sigue igual, avise al administrador.</p></div>').setTitle('Inventario')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   }
 }
 
@@ -207,5 +212,5 @@ function leerRespaldo_(nombre) {
 function estado_() {
   var v = version_(), dir = '';
   try { dir = carpeta_().getName(); } catch (e) {}
-  return { version: v.v, fecha: v.fecha, repo: GH_REPO, ref: ref_(), respaldo: dir };
+  return { version: v.v, fecha: v.fecha, repo: GH_REPO, ref: ref_(), respaldo: dir, cargador: CARGADOR_VERSION };
 }

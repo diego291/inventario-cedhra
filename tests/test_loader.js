@@ -6,6 +6,7 @@ const bad = (f, re, m) => { try { f(); ok(false, m + ' (no falló)'); } catch (e
 // copia de dist en una carpeta temporal para poder "publicar" versiones nuevas
 const D = fs.mkdtempSync(path.join(os.tmpdir(), 'dist-')) + '/';
 for (const f of fs.readdirSync(ROOT + 'dist')) fs.copyFileSync(ROOT + 'dist/' + f, D + f);
+const VA = JSON.parse(fs.readFileSync(ROOT + 'dist/version.json', 'utf8')).v;   // versión actual de dist/
 const md5 = s => crypto.createHash('md5').update(s, 'utf8').digest('base64');
 function publicar(v, cambiar) {
   const vj = JSON.parse(fs.readFileSync(D + 'version.json', 'utf8'));
@@ -24,12 +25,12 @@ L.activarTodo();
 const dir = srv.__files && Object.values(srv.__files).filter(f => f.parent && f.parent.name === 'Código del sistema').map(f => f.n).sort();
 ok(JSON.stringify(dir) === JSON.stringify(['gestion.html', 'index.html', 'nucleo.js', 'version.json']), 'activarTodo: copia en Drive "Código del sistema": ' + dir);
 let st = JSON.parse(srv.call('api_sys_estado', '[]'));
-ok(st.version === '8.0.0' && st.ref === 'main' && st.respaldo === 'Código del sistema', 'estado: ' + JSON.stringify(st));
+ok(st.version === VA && st.ref === 'main' && st.respaldo === 'Código del sistema', 'estado: ' + JSON.stringify(st));
 
 // 2. páginas
 const hi = L.doGet({ parameter: {} }), hg = L.doGet({ parameter: { gestion: '' } });
 ok(hi.title === 'Captura de Conteo' && /PRUEBA\/exec/.test(hi.getContent()) && !/%%APP_URL%%/.test(hi.getContent()), 'doGet: app de conteo con su URL');
-ok(hg.title === 'Gestión de Inventario' && /sistema-version" content="8.0.0/.test(hg.getContent()), 'doGet ?gestion: módulo de gestión v8.0.0');
+ok(hg.title === 'Gestión de Inventario' && new RegExp('sistema-version" content="' + VA).test(hg.getContent()), 'doGet ?gestion: módulo de gestión v' + VA);
 
 // 3. puerta rpc
 bad(() => L.rpc('configurar', []), /no permitida/, 'rpc no deja llamar funciones que no son api_*');
@@ -56,36 +57,36 @@ ok(tParse < 400, 'armar el núcleo en una ejecución nueva: ' + tParse + ' ms (l
 
 // 6. GitHub caído y caché vacía → copia de Drive
 srv.gh.modo = 'caido'; srv.__wipeCache(); nuevaEjecucion();
-ok(JSON.parse(srv.call('api_sys_estado', '[]')).version === '8.0.0' && /Captura/.test(L.doGet({ parameter: {} }).title), 'GitHub caído + caché vacía: funciona con la copia de Drive');
+ok(JSON.parse(srv.call('api_sys_estado', '[]')).version === VA && /Captura/.test(L.doGet({ parameter: {} }).title), 'GitHub caído + caché vacía: funciona con la copia de Drive');
 srv.gh.modo = 'ok';
 
 // 7. versión nueva publicada → se adopta al pasar 5 min
-publicar('8.0.1', n => n + '\nfunction api_nueva801(){ return "hola 8.0.1"; }\n');
-nuevaEjecucion(); ok(JSON.parse(srv.call('api_sys_estado', '[]')).version === '8.0.0', 'antes de 5 min sigue 8.0.0 (no consulta GitHub en cada llamada)');
-pasan5min(); ok(JSON.parse(srv.call('api_sys_estado', '[]')).version === '8.0.1' && JSON.parse(srv.call('api_nueva801', '[]')) === 'hola 8.0.1', 'pasados 5 min adopta 8.0.1 y la función nueva responde');
+publicar('99.0.1', n => n + '\nfunction api_nueva9901(){ return "hola 99.0.1"; }\n');
+nuevaEjecucion(); ok(JSON.parse(srv.call('api_sys_estado', '[]')).version === VA, 'antes de 5 min sigue ' + VA + ' (no consulta GitHub en cada llamada)');
+pasan5min(); ok(JSON.parse(srv.call('api_sys_estado', '[]')).version === '99.0.1' && JSON.parse(srv.call('api_nueva9901', '[]')) === 'hola 99.0.1', 'pasados 5 min adopta 99.0.1 y la función nueva responde');
 const bk = Object.values(srv.__files).find(f => f.parent && f.parent.name === 'Código del sistema' && f.n === 'version.json');
-ok(JSON.parse(bk.text).v === '8.0.1', 'la copia de Drive quedó en 8.0.1');
+ok(JSON.parse(bk.text).v === '99.0.1', 'la copia de Drive quedó en 99.0.1');
 
 // 8. CDN desactualizado: version.json nuevo pero nucleo.js todavía viejo → no cambia hasta que llegue completo
-const n801 = fs.readFileSync(D + 'nucleo.js', 'utf8');
-publicar('8.0.2'); srv.gh.modo = 'viejo'; srv.gh.viejo = { 'nucleo.js': n801 };
-pasan5min(); ok(JSON.parse(srv.call('api_sys_estado', '[]')).version === '8.0.1', 'CDN con archivo viejo: se queda en 8.0.1 (no mezcla versiones)');
-srv.gh.modo = 'ok'; pasan5min(); ok(JSON.parse(srv.call('api_sys_estado', '[]')).version === '8.0.2', 'cuando GitHub ya tiene todo: adopta 8.0.2');
+const n9901 = fs.readFileSync(D + 'nucleo.js', 'utf8');
+publicar('99.0.2'); srv.gh.modo = 'viejo'; srv.gh.viejo = { 'nucleo.js': n9901 };
+pasan5min(); ok(JSON.parse(srv.call('api_sys_estado', '[]')).version === '99.0.1', 'CDN con archivo viejo: se queda en 99.0.1 (no mezcla versiones)');
+srv.gh.modo = 'ok'; pasan5min(); ok(JSON.parse(srv.call('api_sys_estado', '[]')).version === '99.0.2', 'cuando GitHub ya tiene todo: adopta 99.0.2');
 
 // 9. núcleo inválido (huella correcta pero sin las funciones) → se rechaza
-publicar('8.0.3', n => n.replace('function api_login(', 'function api_loginX('));
-pasan5min(); ok(JSON.parse(srv.call('api_sys_estado', '[]')).version === '8.0.2', 'núcleo inválido 8.0.3: se rechaza y sigue 8.0.2');
-publicar('8.0.4', n => n.replace('function api_loginX(', 'function api_login('));
+publicar('99.0.3', n => n.replace('function api_login(', 'function api_loginX('));
+pasan5min(); ok(JSON.parse(srv.call('api_sys_estado', '[]')).version === '99.0.2', 'núcleo inválido 99.0.3: se rechaza y sigue 99.0.2');
+publicar('99.0.4', n => n.replace('function api_loginX(', 'function api_login('));
 
 // 10. actualizar ahora desde Gestión (solo administrador)
 const up = JSON.parse(srv.call('api_sys_actualizar', JSON.stringify([tok])));
-ok(up.version === '8.0.4', 'Gestión › Sistema › "Buscar actualización ahora" instala 8.0.4 sin esperar');
+ok(up.version === '99.0.4', 'Gestión › Sistema › "Buscar actualización ahora" instala 99.0.4 sin esperar');
 bad(() => srv.call('api_sys_actualizar', JSON.stringify(['x'])), /código|Ingrese/, 'actualizar ahora exige administrador');
 
 // 11. GH_REF: fijar una versión anterior
-const V0 = fs.mkdtempSync(path.join(os.tmpdir(), 'v800-')) + '/'; for (const f of fs.readdirSync(ROOT + 'dist')) fs.copyFileSync(ROOT + 'dist/' + f, V0 + f);
-srv.gh.refs = { 'v8.0.0': V0 }; P().setProperty('GH_REF', 'v8.0.0'); pasan5min();
-st = JSON.parse(srv.call('api_sys_estado', '[]')); ok(st.version === '8.0.0' && st.ref === 'v8.0.0', 'GH_REF=v8.0.0 vuelve a la versión anterior sin tocar código');
+const V0 = fs.mkdtempSync(path.join(os.tmpdir(), 'vieja-')) + '/'; for (const f of fs.readdirSync(ROOT + 'dist')) fs.copyFileSync(ROOT + 'dist/' + f, V0 + f);
+srv.gh.refs = { 'vieja': V0 }; P().setProperty('GH_REF', 'vieja'); pasan5min();
+st = JSON.parse(srv.call('api_sys_estado', '[]')); ok(st.version === VA && st.ref === 'vieja', 'GH_REF=vieja vuelve a la versión anterior sin tocar código');
 P().deleteProperty ? P().deleteProperty('GH_REF') : P().setProperty('GH_REF', ''); pasan5min();
-ok(JSON.parse(srv.call('api_sys_estado', '[]')).version === '8.0.4', 'quitar GH_REF regresa a la rama (8.0.4)');
+ok(JSON.parse(srv.call('api_sys_estado', '[]')).version === '99.0.4', 'quitar GH_REF regresa a la rama (99.0.4)');
 console.log(process.exitCode ? 'HAY FALLOS' : 'TODO OK');

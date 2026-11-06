@@ -17,6 +17,7 @@ MODS.config = {
         <div class="row"><span style="flex:1">Versión instalada</span><b class="mono">${esc(s.version || '—')}</b></div>
         <div class="row"><span style="flex:1">Publicada</span><b>${esc(s.fecha || '—')}</b></div>
         <div class="row"><span style="flex:1">Origen</span><b class="mono">${esc(s.repo || '')} · ${esc(s.ref || '')}</b></div>
+        <div class="row"><span style="flex:1">Cargador de Apps Script</span><b class="mono">v${esc(s.cargador || 1)}${(s.cargador || 1) < 2 ? ' · pegar el nuevo' : ''}</b></div>
         <div class="row"><span style="flex:1">Copia de respaldo en Drive</span><b>${s.respaldo ? '✔ ' + esc(s.respaldo) : '—'}</b></div></div>`}
       <p class="hint" style="margin:0">Las mejoras llegan solas desde GitHub: el sistema revisa cada 5 minutos si hay una versión nueva. Si GitHub no responde, sigue funcionando con la copia guardada en su Drive.</p>
       <div class="row"><button class="btn pri" data-act="sysUpd" type="button"${isAdmin() ? '' : ' disabled'}>⟳ Buscar actualización ahora</button><button class="btn" data-act="sysRef" type="button">Volver a consultar</button></div></div></div>`;
