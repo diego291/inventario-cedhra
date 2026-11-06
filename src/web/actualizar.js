@@ -12,10 +12,21 @@
       d.style.cssText = 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:9999;background:#14213D;color:#fff;border-radius:14px;padding:10px 12px 10px 16px;display:flex;gap:12px;align-items:center;box-shadow:0 14px 40px rgba(20,33,61,.35);font:600 14px/1.3 system-ui,sans-serif;max-width:calc(100vw - 32px)';
       document.body.appendChild(d);
     }
-    d.innerHTML = '<span>✨ Hay una versión nueva del sistema (' + v + ')</span><button type="button" style="border:0;border-radius:10px;padding:8px 14px;background:#E08A2E;color:#14213D;font:700 13px system-ui,sans-serif;cursor:pointer">Recargar</button><button type="button" title="Más tarde" style="border:0;background:none;color:#C9D3E3;font-size:16px;cursor:pointer">✕</button>';
-    d.children[1].onclick = () => location.reload();
+    // La app vive dentro de marcos de Google: recargar solo el marco la deja en blanco.
+    // Por eso se abre de nuevo la página completa (la de GitHub o el enlace de Apps Script) con target="_top".
+    const url = urlRecarga();
+    d.innerHTML = '<span>✨ Hay una versión nueva del sistema (' + v + ')</span><a target="_top" style="border:0;border-radius:10px;padding:8px 14px;background:#E08A2E;color:#14213D;font:700 13px system-ui,sans-serif;cursor:pointer;text-decoration:none">Recargar</a><button type="button" title="Más tarde" style="border:0;background:none;color:#C9D3E3;font-size:16px;cursor:pointer">✕</button>';
+    d.children[1].href = url;
     d.children[2].onclick = () => d.remove();
   }
+  function urlRecarga() {
+    const base = (window.APP_URL && !/^<\?|%%/.test(window.APP_URL)) ? window.APP_URL : '';
+    const gest = typeof GES_URL !== 'undefined';
+    if (!base) return gest ? '?gestion' : '?';
+    return base + (gest ? (base.indexOf('?') >= 0 ? '&' : '?') + 'gestion' : '');
+  }
+  window.urlRecarga = urlRecarga;
+  window.avisoVersion = v => { if (v && v !== mia) aviso(v); };
   function revisar() {
     if (!mia || !(window.google && google.script && google.script.run) || Date.now() - ultima < 60000) return;
     ultima = Date.now();

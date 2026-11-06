@@ -231,7 +231,7 @@ if (TOKEN) start(); else showLogin();
 ACT.sysRef = () => { SYS = null; render(); };
 ACT.sysUpd = async b => {
   b.disabled = true;
-  try { const antes = SYS && SYS.version; SYS = await api('api_sys_actualizar'); render(); toast(SYS.version !== antes ? 'Versión nueva instalada: ' + SYS.version + '. Recargue la página para ver los cambios.' : 'Ya tiene la versión más reciente (' + SYS.version + ').'); }
+  try { const antes = SYS && SYS.version; SYS = await api('api_sys_actualizar'); render(); if (SYS.version !== (window.SISTEMA_VERSION || antes) && window.avisoVersion) { window.avisoVersion(SYS.version); toast('Versión ' + SYS.version + ' instalada: toque Recargar abajo.'); } else toast('Ya tiene la versión más reciente (' + SYS.version + ').'); }
   catch (e) { toast(errMsg(e), true); b.disabled = false; }
 };
 
