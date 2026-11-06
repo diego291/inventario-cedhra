@@ -1,0 +1,11 @@
+# Nunca subir datos reales, respaldos ni claves
+tests/privado/
+*.xlsx
+*.xlsm
+*.csv
+*respaldo*.json
+DATOS*.json
+.clasprc.json
+node_modules/
+__pycache__/
+.DS_Store

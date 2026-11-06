@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Captura de Conteo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#F4F2EC; --surface:#FFFDF8; --surface2:#EDEAE1; --fg:#14213D; --muted:#5B6578; --line:#DDD8CC;
+  --accent:#E08A2E; --accent-fg:#14213D; --navy:#14213D; --navy-fg:#F7F5F0;
+  --ok:#2F7D4F; --ok-bg:#E3F1E7; --warn:#A3561A; --warn-bg:#FBEBD8; --bad:#B23A3A; --bad-bg:#F8E1E0; --info:#2D5A8C; --info-bg:#E2EBF5;
+  --b:#2F7D4F; --r:#B98516; --m:#B23A3A;
+  --shadow:0 1px 2px rgba(20,33,61,.06),0 4px 14px rgba(20,33,61,.06);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F1626; --surface:#172034; --surface2:#1F2A41; --fg:#E9ECF2; --muted:#9AA5BA; --line:#2B3852;
+  --accent:#F0A04B; --accent-fg:#14213D; --navy:#0A1020; --navy-fg:#F7F5F0;
+  --ok:#6FCB93; --ok-bg:#183326; --warn:#F2B06B; --warn-bg:#3A2A17; --bad:#F08A8A; --bad-bg:#3A1C1F; --info:#8DB6E8; --info-bg:#1A2B44;
+  --b:#6FCB93; --r:#E8C25A; --m:#F08A8A; --shadow:none; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0F1626; --surface:#172034; --surface2:#1F2A41; --fg:#E9ECF2; --muted:#9AA5BA; --line:#2B3852;
+  --accent:#F0A04B; --accent-fg:#14213D; --navy:#0A1020; --navy-fg:#F7F5F0;
+  --ok:#6FCB93; --ok-bg:#183326; --warn:#F2B06B; --warn-bg:#3A2A17; --bad:#F08A8A; --bad-bg:#3A1C1F; --info:#8DB6E8; --info-bg:#1A2B44;
+  --b:#6FCB93; --r:#E8C25A; --m:#F08A8A; --shadow:none; color-scheme:dark }
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--fg);font-family:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:15px;line-height:1.45}
+.mono,code{font-family:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace}
+button,input,select,textarea{font:inherit;color:inherit}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--navy);color:var(--navy-fg);padding:10px 16px 0}
+.toprow{max-width:880px;margin:0 auto;display:flex;align-items:center;gap:12px}
+.brand{display:flex;flex-direction:column;min-width:0;flex:1}
+.brand small{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand b{font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sync{display:flex;align-items:center;gap:6px;font-size:12px;color:#C9D3E3;flex:0 0 auto}
+.dot{width:8px;height:8px;border-radius:50%;background:#8a94a8}
+.dot.on{background:#6FCB93}.dot.off{background:#F08A8A}.dot.busy{background:#F0A04B}
+nav.tabs{max-width:880px;margin:8px auto 0;display:flex;gap:4px}
+nav.tabs button{flex:1;background:transparent;border:0;color:#C9D3E3;padding:8px 4px;font-weight:500;cursor:pointer;border-bottom:3px solid transparent}
+nav.tabs button[aria-selected="true"]{color:var(--navy-fg);border-bottom-color:var(--accent)}
+main{max-width:880px;margin:0 auto;padding-inline:16px;padding-block:16px 96px;display:flex;flex-direction:column;gap:16px}
+section.tab{display:flex;flex-direction:column;gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px;min-width:0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media (max-width:560px){.grid2,.grid3{grid-template-columns:1fr}}
+label.f,.f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.lbl,label.f>span{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+input[type=text],input[type=date],input[type=search],input[type=number],select,textarea{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:44px}
+textarea{min-height:64px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:0;border-color:transparent}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:10px;border:1px solid var(--line);background:var(--surface2);padding:10px 14px;min-height:44px;font-weight:600;cursor:pointer;text-align:center}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.btn.dark{background:var(--navy);border-color:var(--navy);color:var(--navy-fg)}
+.btn.ghost{background:transparent}
+.btn.danger{background:var(--bad-bg);color:var(--bad);border-color:transparent}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.sm{min-height:34px;padding:6px 10px;font-size:13px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.spacer{flex:1}
+.locbar{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+.locbar .f{flex:1 1 220px}
+.locbar .f.narrow{flex:0 1 160px}
+.locinfo{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;color:var(--muted)}
+.sugg{position:relative}
+.sugg ul{list-style:none;margin:4px 0 0;padding:4px;position:absolute;left:0;right:0;top:100%;z-index:15;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);max-height:340px;overflow:auto}
+.sugg li{padding:8px 10px;border-radius:8px;cursor:pointer;display:flex;gap:10px;align-items:baseline}
+.sugg li[aria-selected="true"],.sugg li:hover{background:var(--surface2)}
+.sugg li .mono{font-weight:600;color:var(--warn);flex:0 0 auto}
+.sugg li small{color:var(--muted);display:block;font-size:12px}
+.sugg li.free{border-top:1px dashed var(--line);margin-top:4px}
+.chosen{display:flex;align-items:center;gap:10px;background:var(--info-bg);border-radius:10px;padding:8px 12px;flex-wrap:wrap}
+.chosen .mono{font-weight:600;color:var(--info)}
+.chosen .ctx{flex-basis:100%;font-size:12.5px;color:var(--muted)}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:12.5px;font-weight:600;line-height:1.35}
+.chip.ok{background:var(--ok-bg);color:var(--ok)}.chip.warn{background:var(--warn-bg);color:var(--warn)}.chip.bad{background:var(--bad-bg);color:var(--bad)}.chip.info{background:var(--info-bg);color:var(--info)}.chip.mut{background:var(--surface2);color:var(--muted)}
+.status{font-size:13px;border-radius:10px;padding:8px 12px;line-height:1.45;display:flex;flex-direction:column;gap:6px}
+.status.ok{background:var(--ok-bg);color:var(--ok)}.status.warn{background:var(--warn-bg);color:var(--warn)}.status.bad{background:var(--bad-bg);color:var(--bad)}.status.info{background:var(--info-bg);color:var(--info)}
+.oldrec{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:12.5px;color:var(--fg)}
+.oldrec dt{color:var(--muted)}.oldrec dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.qgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.qbox{border:1px solid var(--line);border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:6px;border-top:4px solid var(--c);min-width:0}
+.qbox .lbl{color:var(--c)}
+.qbox input{font-size:24px;font-weight:600;text-align:center;font-variant-numeric:tabular-nums;padding:6px;min-height:52px;background:var(--bg)}
+.qbox .pm{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px}
+.qbox .pm button{min-height:34px;border-radius:8px;border:1px solid var(--line);background:var(--surface2);font-weight:600;cursor:pointer;font-size:14px;padding:0}
+@media (max-width:560px){.qgrid{grid-template-columns:1fr}.qbox{display:grid;grid-template-columns:76px 1fr 132px;align-items:center;border-top:1px solid var(--line);border-left:5px solid var(--c)}.qbox input{min-height:46px;font-size:22px}}
+.total{font-size:14px;color:var(--muted)}.total b{color:var(--fg);font-size:18px;font-variant-numeric:tabular-nums}
+details.more{border-top:1px solid var(--line);padding-top:10px}
+details.more summary{cursor:pointer;font-weight:600;color:var(--muted);font-size:13px}
+details.more[open] summary{margin-bottom:12px}
+.photos{display:flex;gap:10px;flex-wrap:wrap}
+.ph{display:flex;flex-direction:column;gap:4px;width:110px}
+.ph img{width:110px;height:82px;object-fit:cover;border-radius:10px;border:1px solid var(--line);background:var(--surface2)}
+.ph small{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--muted);overflow-wrap:anywhere;line-height:1.3}
+.ph button{font-size:11.5px;border:0;background:none;color:var(--bad);cursor:pointer;padding:0;text-align:left}
+.sec-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.sec-h h2{font-size:18px;margin:0;font-weight:600;text-wrap:balance}
+.sec-h .meta{color:var(--muted);font-size:13px}
+.kpis{display:flex;gap:8px;flex-wrap:wrap}
+.kpi{background:var(--surface2);border-radius:10px;padding:6px 12px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.kpi b{display:block;font-size:18px;color:var(--fg)}
+.kpi.b b{color:var(--b)}.kpi.r b{color:var(--r)}.kpi.m b{color:var(--m)}
+.items{display:flex;flex-direction:column;gap:8px}
+.item{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;grid-template-columns:1fr auto;gap:6px 12px;background:var(--surface)}
+.item.editing{outline:2px solid var(--accent)}
+.item.rev{border-left:4px solid var(--warn)}
+.item .t{min-width:0}
+.item .t .mono{font-weight:600;color:var(--warn);margin-right:6px}
+.item .t .d{font-weight:600}
+.item .sub{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px;color:var(--muted)}
+.item .q{display:flex;gap:8px;font-variant-numeric:tabular-nums;font-weight:600;align-items:center}
+.q .qb{color:var(--b)}.q .qr{color:var(--r)}.q .qm{color:var(--m)}.q .qt{background:var(--surface2);border-radius:8px;padding:2px 8px;color:var(--fg)}
+.item .thumbs{display:flex;gap:4px}
+.item .thumbs img{width:40px;height:40px;object-fit:cover;border-radius:6px}
+.item .acts{grid-column:1/-1;display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.empty{color:var(--muted);text-align:center;padding:20px;border:1px dashed var(--line);border-radius:12px}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:var(--surface2)}
+td.n,th.n{text-align:right}
+tr.diff-pos td.dv{color:var(--info);font-weight:700}
+tr.diff-neg td.dv{color:var(--bad);font-weight:700}
+.prog{height:10px;background:var(--surface2);border-radius:999px;overflow:hidden}
+.prog>div{height:100%;background:var(--accent)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--navy);color:var(--navy-fg);padding:10px 16px;border-radius:10px;font-weight:500;z-index:50;max-width:calc(100% - 32px);box-shadow:0 8px 24px rgba(0,0,0,.25);display:flex;gap:12px;align-items:center}
+.toast button{background:none;border:0;color:var(--accent);font-weight:700;cursor:pointer;padding:4px}
+.loclist{display:flex;flex-direction:column;gap:6px}
+.locrow{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.locrow .nm{font-weight:600;min-width:0}
+.locrow .nm small{display:block;color:var(--muted);font-weight:400;font-size:12px}
+.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.hint{font-size:12.5px;color:var(--muted)}
+.banner{border-radius:12px;padding:12px 14px;background:var(--warn-bg);color:var(--warn);font-size:14px}
+.panel{border:1px dashed var(--accent);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;background:var(--bg)}
+.chk{display:flex;gap:8px;align-items:center;font-weight:500}
+.chk input{width:20px;height:20px;accent-color:var(--accent)}
+
+nav.tabs{overflow-x:auto;scrollbar-width:none}
+nav.tabs::-webkit-scrollbar{display:none}
+header nav.tabs button{flex:1 0 auto;white-space:nowrap;padding:8px 6px}
+@media (max-width:480px){header nav.tabs button{font-size:12.5px;padding:8px 5px}}
+.refchips{display:flex;gap:6px;flex-wrap:wrap}
+.rf{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer;color:var(--muted);min-height:34px}
+.rf[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:var(--navy-fg)}
+.rgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+@media (max-width:560px){.rgrid{grid-template-columns:1fr 1fr;gap:8px}.rcard .rb{padding:8px}.rcard .rb small{font-size:11.5px}}
+.rcard{border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden;cursor:pointer;display:flex;flex-direction:column;text-align:left;padding:0;min-width:0}
+.rcard.val{border:2px solid var(--ok)}
+.rcard .rimg{position:relative;aspect-ratio:4/3;background:var(--surface2)}
+.rcard .rimg img{width:100%;height:100%;object-fit:cover;display:block}
+.rcard .rimg .noimg{display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:12px}
+.rcard .rimg .nf{position:absolute;right:6px;bottom:6px;background:rgba(10,16,32,.72);color:#fff;border-radius:999px;font-size:11.5px;font-weight:600;padding:2px 8px}
+.rcard .rimg .vb{position:absolute;left:6px;top:6px;background:var(--ok);color:#fff;border-radius:999px;font-size:11.5px;font-weight:700;padding:2px 8px}
+.rcard .rb{padding:10px 12px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.rcard .rb .t{font-weight:600;line-height:1.3}
+.rcard .rb .t .mono{color:var(--warn);margin-right:6px}
+.rcard .rb .chips{display:flex;gap:4px;flex-wrap:wrap}
+.rcard .rb .chips .chip{font-size:11.5px;padding:2px 8px}
+.rcard .rb small{color:var(--muted);font-size:12px;line-height:1.35}
+.rview{position:relative;background:#0A1020;border-radius:12px;overflow:hidden;display:flex;align-items:center;justify-content:center;min-height:200px}
+.rview img{max-width:100%;max-height:62vh;display:block;object-fit:contain}
+.rview .nav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(10,16,32,.6);color:#fff;border:0;border-radius:999px;width:40px;height:40px;font-size:20px;cursor:pointer}
+.rview .nav.p{left:8px}.rview .nav.n{right:8px}
+.rcap{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:2px}
+.rcap .mono{color:var(--fg);font-size:12px;overflow-wrap:anywhere}
+.rstrip{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+.rstrip button{border:2px solid transparent;border-radius:8px;padding:0;background:none;cursor:pointer;flex:0 0 auto}
+.rstrip button[aria-current="true"]{border-color:var(--accent)}
+.rstrip img{width:64px;height:48px;object-fit:cover;border-radius:6px;display:block;background:var(--surface2)}
+.rsec{border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:8px}
+.rsec h3{margin:0;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.rcrit{display:flex;gap:12px;align-items:flex-start}
+.rcrit img{width:120px;aspect-ratio:16/9;object-fit:cover;object-position:left center;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;flex:0 0 auto}
+@media (max-width:560px){.rcrit{flex-direction:column}.rcrit img{width:100%}}
+.item .thumbs img{cursor:pointer}
+
+.bell{position:relative;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:var(--navy-fg);border-radius:10px;min-width:40px;height:40px;font-size:18px;cursor:pointer;flex:0 0 auto}
+.bell .qbadge{position:absolute;top:-6px;right:-6px;background:var(--bad);color:#fff}
+.bell.ring{animation:ring 1s ease-in-out 3}
+@keyframes ring{0%,100%{transform:rotate(0)}20%{transform:rotate(-15deg)}40%{transform:rotate(12deg)}60%{transform:rotate(-8deg)}80%{transform:rotate(5deg)}}
+.revbox{display:flex;flex-direction:column;gap:8px}
+.revbox .row .btn{flex:1 1 160px}
+.revalert{display:flex;flex-direction:column;gap:8px;position:sticky;top:calc(env(safe-area-inset-top,0px) + 112px);z-index:18}
+.ra{border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);border:2px solid var(--info);background:var(--info-bg);color:var(--fg)}
+.ra.warn{border-color:var(--warn);background:var(--warn-bg)}.ra.ok{border-color:var(--ok);background:var(--ok-bg)}
+.ra b.h{font-size:15px}
+.ra .row .btn{flex:1 1 120px}
+.rqi{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;background:var(--surface)}
+</style>
+</head>
+<body>
+<div id="bootErr" style="display:none;margin:12px 16px;padding:12px 14px;border-radius:12px;background:#F8E1E0;color:#B23A3A;font:14px/1.45 system-ui,sans-serif"></div>
+<script>
+(function(){
+  var t0=Date.now();
+  function show(msg){ var b=document.getElementById('bootErr'); if(!b) return; b.style.display='block'; b.innerHTML=msg; }
+  window.__bootShow=show;
+  window.onerror=function(m,src,l){ show('\x3cb>Error en la página:\x3c/b> '+m+' (línea '+l+').\x3cbr>Si usa un celular antiguo, pruebe con Chrome actualizado.'); };
+  setTimeout(function(){
+    if(window.__ready) return;
+    var st=(document.getElementById('syncTxt')||{}).textContent||'';
+    if(st.indexOf('Iniciando')===0) show('\x3cb>La página no arrancó.\x3c/b> El navegador no pudo ejecutar la app. Actualice Chrome o pruebe en otro navegador.');
+    else show('\x3cb>El servidor de Google no responde.\x3c/b>\x3cbr>1) Si tiene \x3cb>varias cuentas de Google abiertas\x3c/b> en este navegador, abra el enlace en una ventana de incógnito con una sola cuenta.\x3cbr>2) En Apps Script, revise el panel \x3cb>Ejecuciones\x3c/b> por errores.\x3cbr>3) Si cambió el código, publique una versión nueva (Implementar \x26gt; Administrar implementaciones \x26gt; Editar \x26gt; Nueva versión).');
+  }, 25000);
+})();
+</script>
+<style>
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.ccard{border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden;cursor:pointer;display:flex;flex-direction:column;text-align:left;padding:0}
+.ccard img,.ccard .noimg{width:100%;aspect-ratio:16/9;object-fit:cover;object-position:left center;background:#fff;display:block}
+.ccard .noimg{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;background:var(--surface2)}
+.ccard div{padding:8px 10px;font-size:13px;line-height:1.3}
+.ccard .mono{font-weight:600;color:var(--warn);display:block}
+.modal{position:fixed;inset:0;z-index:60;background:rgba(10,16,32,.6);display:flex;align-items:flex-end;justify-content:center;padding:env(safe-area-inset-top,0px) 0 0}
+.sheet{background:var(--surface);color:var(--fg);width:100%;max-width:880px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:12px}
+@media (min-width:700px){.modal{align-items:center}.sheet{border-radius:16px;max-height:88vh}}
+.sheet .fimg{width:100%;border-radius:12px;border:1px solid var(--line);background:#fff;min-height:120px}
+.fdl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14px;margin:0}
+.fdl dt{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding-top:2px}
+.fdl dd{margin:0;min-width:0}
+@media (max-width:560px){.fdl{grid-template-columns:1fr;gap:2px}.fdl dd{margin-bottom:8px}}
+.lnk{color:var(--info);font-weight:600;text-decoration:underline;cursor:pointer;background:none;border:0;padding:0;font:inherit}
+.chosen .thumb{width:84px;height:48px;object-fit:cover;object-position:left center;border-radius:6px;background:#fff;cursor:pointer;border:1px solid var(--line)}
+.links{display:flex;flex-direction:column;gap:6px}
+.links a{color:var(--info);font-weight:600}
+nav.tabs button{font-size:13.5px;padding:8px 2px}
+.tbadge{display:inline-block;min-width:18px;margin-left:4px;padding:0 5px;border-radius:999px;background:var(--accent);color:var(--accent-fg);font-size:11px;font-weight:700;line-height:18px;text-align:center}
+.thread{display:flex;flex-direction:column;gap:6px;grid-column:1/-1}
+.msg{border-radius:10px;padding:8px 10px;font-size:13.5px;background:var(--surface2);border-left:4px solid var(--line)}
+.msg.revisor{background:var(--info-bg);border-left-color:var(--info)}
+.msg.revisor.Corregir{background:var(--bad-bg);border-left-color:var(--bad)}
+.msg.revisor.Duda{background:var(--warn-bg);border-left-color:var(--warn)}
+.msg.revisor.Correcto{background:var(--ok-bg);border-left-color:var(--ok)}
+.msg .who{font-size:11.5px;color:var(--muted);font-weight:600;letter-spacing:.03em}
+.reply{grid-column:1/-1;display:flex;flex-direction:column;gap:6px}
+.reply textarea{min-height:48px}
+.sync{background:none;border:0;cursor:pointer;padding:4px 2px}
+.qbadge{background:var(--accent);color:var(--accent-fg);border-radius:999px;font-size:11px;font-weight:700;padding:0 6px;line-height:18px}
+.item.pend{border-style:dashed;border-color:var(--accent)}
+.ubtn{display:flex;flex-direction:column;align-items:flex-end;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:var(--navy-fg);border-radius:10px;padding:4px 10px;cursor:pointer;line-height:1.2;max-width:150px}
+.ubtn span{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px}
+.ubtn small{font-size:11px;opacity:.75}
+.login{position:fixed;inset:0;z-index:90;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto}
+.lcard{width:100%;max-width:420px;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:24px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
+.lcard .lk{font-size:12px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--warn)}
+.lcard h1{margin:0;font-size:24px;text-wrap:balance}
+#inCode{font-size:30px;text-align:center;letter-spacing:.18em;text-transform:uppercase;min-height:60px;font-weight:600}
+.ucard{border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;background:var(--surface)}
+.ucard.off{opacity:.7;background:var(--surface2)}
+.ucard .top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ucard .top b{font-size:16px}
+.devs{display:flex;flex-direction:column;gap:6px}
+.dev{display:flex;gap:8px;align-items:center;font-size:13px;background:var(--surface2);border-radius:8px;padding:6px 10px;flex-wrap:wrap}
+.codebox{font-family:'IBM Plex Mono',monospace;font-size:40px;font-weight:700;letter-spacing:.15em;text-align:center;padding:16px;border:2px dashed var(--accent);border-radius:14px;background:var(--bg)}
+.loglist{display:flex;flex-direction:column;gap:4px;max-height:520px;overflow:auto}
+.logi{font-size:13px;border-bottom:1px solid var(--line);padding:6px 2px;display:flex;flex-direction:column;gap:1px;min-width:0}
+.logi .h{display:flex;gap:8px;flex-wrap:wrap;align-items:baseline}
+.logi .h b{font-size:13.5px}
+.logi .d{color:var(--muted);overflow-wrap:anywhere}
+.logi.alert b,.logi.alert .a{color:var(--bad)}
+.delrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13.5px;border:1px dashed var(--line);border-radius:10px;padding:8px 10px}
+</style>
+
+<header class="top">
+  <div class="toprow">
+    <div class="brand"><small id="hdrInst">Conteo físico 2026</small><b id="hdrLoc">Captura de Conteo</b></div>
+    <button type="button" class="sync" id="btnSync" title="Estado de envío"><span class="dot" id="dot"></span><span id="syncTxt">Iniciando…</span><span class="qbadge" id="qBadge" hidden></span></button>
+    <button type="button" class="bell" id="btnBell" hidden title="Solicitudes de revisión">🔔<span class="qbadge" id="bellBadge" hidden></span></button>
+    <button type="button" class="ubtn" id="btnUser" hidden><span id="uName"></span><small id="uRole"></small></button>
+  </div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="cap" aria-selected="true">Capturar</button>
+    <button role="tab" data-tab="cat" aria-selected="false">Catálogo</button>
+    <button role="tab" data-tab="refs" aria-selected="false">Referencias</button>
+    <button role="tab" data-tab="ficha" aria-selected="false">Ficha</button>
+    <button role="tab" data-tab="equipo" aria-selected="false" id="tabEquipo" hidden>Equipo<span class="tbadge" id="eqBadge" hidden></span></button>
+    <button role="tab" data-tab="avance" aria-selected="false">Avance</button>
+  </nav>
+</header>
+
+<main>
+  <div class="status warn" id="offBanner" hidden></div>
+  <div class="status bad" id="rejBanner" hidden></div>
+  <div class="revalert" id="revAlert" hidden></div>
+  <div class="banner" id="noDb" hidden>No hay conexión con la hoja de Google. Recargue la página; si sigue igual, revise que tenga acceso a la hoja.</div>
+
+  <!-- ===== CAPTURAR ===== -->
+  <section class="tab" id="tab-cap">
+    <div class="card">
+      <div class="locbar">
+        <div class="f"><span class="lbl">Ubicación</span><select id="selUbic"></select></div>
+        <label class="f narrow"><span>Fecha</span><input type="date" id="inFecha"></label>
+        <label class="f"><span>Contado por</span><select id="selCont" disabled></select></label>
+      </div>
+      <div class="panel" id="newLoc" hidden>
+        <b>Agregar ubicación no contemplada</b>
+        <div class="grid3">
+          <label class="f"><span>Nombre</span><input type="text" id="nlNombre" placeholder="Ej.: BODEGA BAJO GRADAS"></label>
+          <label class="f"><span>Tipo</span><select id="nlTipo"></select></label>
+          <label class="f"><span>Edificio / zona</span><input type="text" id="nlZona" placeholder="Edificio C"></label>
+        </div>
+        <label class="f"><span>Por qué no estaba en la lista</span><input type="text" id="nlNota" placeholder="Bodega nueva, cuarto que no estaba registrado…"></label>
+        <div class="row"><button type="button" class="btn primary sm" id="nlOk">Agregar y usar</button><button type="button" class="btn ghost sm" id="nlCancel">Cancelar</button><span class="hint" id="nlMsg"></span></div>
+        <p class="hint" style="margin:0">Queda en la hoja UBICACIONES con “Nueva = Sí”. Antes de pasar al Excel, agréguela al final de CONFIG.</p>
+      </div>
+      <div class="locinfo" id="locInfo"></div>
+      <details class="more" id="locMore" hidden>
+        <summary>Nota y foto general de la ubicación</summary>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <label class="f"><span>Nota de la ubicación</span><textarea id="locNota" placeholder="Llave con conserje · faltó contar el estante alto · bienes de otra aula guardados aquí…"></textarea></label>
+          <div class="row"><button type="button" class="btn sm" id="locNotaSave">Guardar nota</button><span class="hint" id="locNotaMsg"></span></div>
+          <div class="f"><span class="lbl">Foto general</span><div class="photos" id="locFotos"></div>
+            <div class="row"><label class="btn sm">Cámara<input type="file" accept="image/*" capture="environment" data-locfoto hidden></label><label class="btn sm">Galería<input type="file" accept="image/*" data-locfoto hidden></label><span class="hint" id="locFotoMsg"></span></div>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <form class="card" id="frm" autocomplete="off">
+      <div class="sec-h"><h2 id="frmTitle">Nuevo registro</h2><span class="spacer"></span><button type="button" class="btn ghost sm" id="btnCancel">Limpiar</button></div>
+      <div class="f" id="bienWrap"><span class="lbl">1 · Bien según catálogo</span>
+        <div class="sugg">
+          <input type="search" id="inBien" placeholder="Código (1154), nombre (pupitre) o etiqueta vieja" aria-autocomplete="list">
+          <ul id="lsBien" hidden role="listbox"></ul>
+        </div>
+        <span class="hint">¿Duda de qué bien es? Revise la pestaña <button type="button" class="lnk" id="goCat">Catálogo</button> con los dibujos y medidas.</span>
+      </div>
+      <div class="chosen" id="bienChosen" hidden></div>
+
+      <label class="f"><span>2 · Etiqueta que tiene (código completo o N° de serie)</span>
+        <input type="text" id="inEtq" class="mono" placeholder="11674-1103-0015 · vacío si no tiene">
+      </label>
+      <div id="etqStatus" class="status" hidden></div>
+      <label class="f" id="justWrap" hidden><span>Justificación de la etiqueta repetida (obligatoria)</span><input type="text" id="inJust" placeholder="Ej.: dos bienes con la misma etiqueta; uno se reetiqueta"></label>
+
+      <div class="f"><span class="lbl">3 · Cantidades (escriba el número o use los botones)</span>
+        <div class="qgrid">
+          <div class="qbox" style="--c:var(--b)"><span class="lbl">Bueno</span><input type="number" min="0" step="1" inputmode="numeric" id="qb" value="0" aria-label="Cantidad en buen estado"><div class="pm"><button type="button" data-k="b" data-d="-1">−1</button><button type="button" data-k="b" data-d="1">+1</button><button type="button" data-k="b" data-d="10">+10</button></div></div>
+          <div class="qbox" style="--c:var(--r)"><span class="lbl">Regular</span><input type="number" min="0" step="1" inputmode="numeric" id="qr" value="0" aria-label="Cantidad en estado regular"><div class="pm"><button type="button" data-k="r" data-d="-1">−1</button><button type="button" data-k="r" data-d="1">+1</button><button type="button" data-k="r" data-d="10">+10</button></div></div>
+          <div class="qbox" style="--c:var(--m)"><span class="lbl">Malo</span><input type="number" min="0" step="1" inputmode="numeric" id="qm" value="0" aria-label="Cantidad en mal estado"><div class="pm"><button type="button" data-k="m" data-d="-1">−1</button><button type="button" data-k="m" data-d="1">+1</button><button type="button" data-k="m" data-d="10">+10</button></div></div>
+        </div>
+        <div class="row"><div class="total">Total: <b id="qTot">0</b></div><span class="spacer"></span><span class="hint" id="rangeHint"></span></div>
+        <div id="qWarn" class="status warn" hidden></div>
+      </div>
+
+      <div class="f"><span class="lbl">4 · Fotos</span>
+        <div class="photos" id="frmFotos"></div>
+        <div class="row">
+          <select id="fotoTipo" style="width:auto;min-height:38px;padding:6px 10px"><option value="">Bien</option><option value="ETIQUETA">Etiqueta</option><option value="SERIE">Placa / serie</option><option value="DANO">Daño</option></select>
+          <label class="btn sm">Cámara<input type="file" accept="image/*" capture="environment" data-frmfoto hidden></label>
+          <label class="btn sm">Galería<input type="file" accept="image/*" data-frmfoto hidden></label>
+          <span class="hint" id="fotoMsg"></span>
+        </div>
+        <span class="hint" id="fotoNext"></span>
+      </div>
+
+      <details class="more" id="more">
+        <summary>Marca, modelo, serie, observaciones y revisión</summary>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="grid3">
+            <label class="f"><span>Marca</span><input type="text" id="inMarca" placeholder="HP"></label>
+            <label class="f"><span>Modelo</span><input type="text" id="inModelo" placeholder="ProBook 440"></label>
+            <label class="f"><span>N° de serie</span><input type="text" id="inSerie" class="mono" placeholder="5CG0519K6R"></label>
+          </div>
+          <div id="serieStatus" class="status" hidden></div>
+          <label class="f"><span>Observaciones</span><textarea id="inObs" placeholder="Pata floja, sin cargador, en préstamo…"></textarea></label>
+          <label class="chk"><input type="checkbox" id="chkRev"> Marcar para revisión del encargado</label>
+          <label class="f" id="revWrap" hidden><span>Motivo de la revisión</span><input type="text" id="inRev" placeholder="No sé si es armario o estante · etiqueta ilegible…"></label>
+          <label class="f"><span>Institución (para códigos nuevos)</span><select id="selInst"></select></label>
+        </div>
+      </details>
+
+      <div class="status bad" id="lockLine" hidden><span>🔒 Esta ubicación está <b>cerrada</b> (revisada por un supervisor): ya no se pueden agregar, editar ni eliminar registros aquí. Si falta algo, pida a un supervisor o al administrador que la reabra.</span></div>
+      <div id="reqLine" class="status warn" hidden></div>
+      <div class="row"><button type="submit" class="btn primary" id="btnSave" style="flex:1">Guardar registro</button></div>
+      <div id="frmErr" class="status bad" hidden></div>
+    </form>
+
+    <div class="card">
+      <div class="sec-h"><h2 id="listTitle">Registros de la ubicación</h2><span class="meta" id="listMeta"></span></div>
+      <div class="revbox" id="revBox" hidden></div>
+      <div class="kpis" id="kpis"></div>
+      <div id="locAlerts" style="display:flex;flex-direction:column;gap:6px"></div>
+      <input type="search" id="inFiltro" placeholder="Filtrar esta lista por bien, etiqueta, serie u observación" hidden>
+      <div class="items" id="items"></div>
+    </div>
+  </section>
+
+  <!-- ===== CATÁLOGO ===== -->
+  <section class="tab" id="tab-cat" hidden>
+    <div class="card">
+      <div class="sec-h"><h2>Catálogo ilustrado</h2><span class="meta" id="catMeta"></span></div>
+      <input type="search" id="catQ" placeholder="Buscar: pupitre, 1154, armario, bocina…">
+      <label class="chk hint"><input type="checkbox" id="catSoloImg" checked> Solo bienes con dibujo</label>
+      <div class="cgrid" id="catGrid"></div>
+      <p class="hint">Los dibujos muestran medidas típicas, no el bien real. Confirme midiendo antes de clasificar.</p>
+    </div>
+  </section>
+
+  <!-- ===== REFERENCIAS ===== -->
+  <section class="tab" id="tab-refs" hidden>
+    <div class="card">
+      <div class="sec-h"><h2>Referencias</h2><span class="meta" id="refMeta"></span></div>
+      <p class="hint" style="margin:0">Bienes ya registrados, con su foto y el criterio del catálogo con que se clasificaron. Busque uno igual al que tiene enfrente y úselo de guía. Los marcados <b>✓ Validada</b> ya los revisó un supervisor.</p>
+      <input type="search" id="refQ" placeholder="Buscar: pupitre, 1154, maniquí, HP, A1, nombre…">
+      <div class="refchips" id="refFil">
+        <button type="button" class="rf" data-rf="all" aria-pressed="true">Todos</button>
+        <button type="button" class="rf" data-rf="val" aria-pressed="false">✓ Validadas</button>
+        <button type="button" class="rf" data-rf="rev" aria-pressed="false">Por revisar</button>
+        <button type="button" class="rf" data-rf="sincat" aria-pressed="false">Fuera de catálogo</button>
+        <button type="button" class="rf" data-rf="dano" aria-pressed="false">Con daño</button>
+        <button type="button" class="rf" data-rf="reet" aria-pressed="false">Reetiquetar</button>
+      </div>
+      <label class="chk"><input type="checkbox" id="refSoloFoto" checked> Solo con fotos</label>
+      <div class="status info" id="refBlkNote" hidden></div>
+      <div class="rgrid" id="refGrid"></div>
+      <button type="button" class="btn ghost" id="refMore" hidden>Ver más</button>
+    </div>
+  </section>
+  <!-- ===== FICHA ===== -->
+  <section class="tab" id="tab-ficha" hidden>
+    <div class="card">
+      <div class="sec-h"><h2 id="fichaTitle">Ficha</h2><span class="meta">Contado frente al inventario anterior de esta ubicación</span></div>
+      <div class="kpis" id="fichaKpis"></div>
+      <div class="tbl"><table><thead><tr><th>Bloque</th><th>Bien</th><th class="n">Anterior</th><th class="n">Contado</th><th class="n">Dif.</th></tr></thead><tbody id="fichaBody"></tbody></table></div>
+      <p class="hint">La diferencia es solo referencia: el inventario anterior no es la verdad. Si falta algo con número de serie, búsquelo en otra ubicación antes de mandarlo a descargo.</p>
+    </div>
+    <div class="card">
+      <div class="sec-h"><h2>Códigos anteriores de esta ubicación</h2><span class="meta" id="antMeta"></span></div>
+      <input type="search" id="antFiltro" placeholder="Buscar por código, bien, marca o serie">
+      <div class="tbl" style="max-height:420px"><table><thead><tr><th>Código</th><th>Bien</th><th>Marca / serie</th><th>Adquirido</th><th>¿Visto?</th></tr></thead><tbody id="antBody"></tbody></table></div>
+      <p class="hint">“Visto” se marca cuando alguien registró esa etiqueta (o su serie) en cualquier ubicación.</p>
+    </div>
+  </section>
+
+  <!-- ===== AVANCE ===== -->
+  <section class="tab" id="tab-equipo" hidden>
+    <div class="card" id="eqReqCard" hidden>
+      <div class="sec-h"><h2>Solicitudes de dispositivo</h2><span class="meta">Alguien intentó entrar con su código desde otro aparato</span></div>
+      <div class="items" id="eqReqs"></div>
+    </div>
+    <div class="card">
+      <div class="sec-h"><h2>Jornada</h2><span class="meta" id="eqJorMeta"></span></div>
+      <div class="row">
+        <button type="button" class="btn danger" id="btnFin">Terminar jornada</button>
+        <span class="spacer"></span>
+        <label class="row hint">Iniciar hasta <input type="time" id="inHasta" value="17:00" style="width:auto;min-height:38px"></label>
+        <button type="button" class="btn primary" id="btnIni">Iniciar jornada</button>
+      </div>
+      <p class="hint" style="margin:0">“Terminar” desactiva a todos los contadores de una vez. “Iniciar” los activa hasta la hora indicada (deje la hora vacía para no poner límite). Supervisores y administradores no se afectan.</p>
+    </div>
+    <div class="card">
+      <div class="sec-h"><h2>Personas</h2><span class="meta" id="eqMeta"></span><span class="spacer"></span><label class="chk hint"><input type="checkbox" id="eqBajas"> Mostrar dadas de baja</label></div>
+      <div class="items" id="eqUsers"></div>
+      <details class="more" id="eqAdd">
+        <summary>＋ Agregar persona</summary>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div class="grid3">
+            <label class="f"><span>Nombre completo</span><input type="text" id="nuNombre" placeholder="Nombre y apellido"></label>
+            <label class="f"><span>Rol</span><select id="nuRol"><option>Contador</option><option>Supervisor</option><option>Administrador</option></select></label>
+            <label class="f"><span>Dispositivos permitidos</span><input type="number" id="nuMax" min="1" max="10" value="1"></label>
+          </div>
+          <label class="f"><span>Acceso válido hasta (opcional)</span><input type="datetime-local" id="nuVence"></label>
+          <div class="row"><button type="button" class="btn primary" id="btnNu">Agregar y generar código</button><span class="hint" id="nuMsg"></span></div>
+        </div>
+      </details>
+    </div>
+    <div class="card">
+      <div class="sec-h"><h2>Registros eliminados</h2><span class="meta">Nada se borra de la hoja: aquí se restauran</span></div>
+      <div class="items" id="eqDel"></div>
+    </div>
+    <div class="card">
+      <div class="sec-h"><h2>Bitácora</h2><span class="meta">Últimas 200 acciones</span></div>
+      <input type="search" id="eqLogQ" placeholder="Filtrar por persona, acción, ubicación…">
+      <div class="loglist" id="eqLog"></div>
+    </div>
+  </section>
+
+  <section class="tab" id="tab-avance" hidden>
+    <div class="card">
+      <div class="sec-h"><h2>Avance del conteo</h2><span class="meta" id="avMeta"></span></div>
+      <div class="prog"><div id="avBar" style="width:0"></div></div>
+      <div class="kpis" id="avKpis"></div>
+      <div class="tbl"><table><thead><tr><th>Contado por</th><th class="n">Registros</th><th class="n">Bienes</th><th class="n">Fotos</th><th class="n">Por revisar</th></tr></thead><tbody id="avPers"></tbody></table></div>
+    </div>
+    <div class="card" id="cardGestion" hidden>
+      <div class="sec-h"><h2>Gestión de Inventario</h2></div>
+      <p class="hint" style="margin:0 0 10px">Códigos asignados, fichas y actas, reportes y configuración. Mejor en computadora.</p>
+      <div class="row"><a class="btn dark" id="lnkGestion" href="?gestion" target="_top">🖥 Abrir Gestión de Inventario</a></div>
+    </div>
+    <div class="card" id="cardExport">
+      <div class="sec-h"><h2>Pasar al Excel de conteo</h2></div>
+      <div class="row"><button class="btn dark" id="btnExport" type="button">Generar hoja para el Excel</button><span class="hint" id="expMsg"></span></div>
+      <div class="links" id="expLinks"></div>
+      <ol class="steps">
+        <li>Si hay ubicaciones nuevas, agréguelas primero al final de la lista de CONFIG en el Excel.</li>
+        <li>Descargue el .xlsx, abra la hoja <b>PEGAR_EN_CONTEO</b> y copie desde <b>B6</b> hasta la última fila de la columna <b>U</b>.</li>
+        <li>En CONTEO, clic en <b>B6</b> → Pegado especial → <b>Valores</b> + <b>Saltar blancos</b>. Si usó otra institución, copie también la columna <b>AM</b>.</li>
+        <li>La columna R trae el enlace de Drive de cada foto; “Ver foto” la abre. Presione F9.</li>
+      </ol>
+    </div>
+    <div class="card">
+      <div class="sec-h"><h2>Ubicaciones</h2><span class="spacer"></span><label class="chk hint"><input type="checkbox" id="chkSoloAct" checked> Solo activas y nuevas</label></div>
+      <div class="loclist" id="locList"></div>
+    </div>
+  </section>
+</main>
+
+<div class="modal" id="modal" hidden><div class="sheet" id="modalBody" role="dialog" aria-modal="true"></div></div>
+<div class="login" id="login" hidden>
+  <form class="lcard" id="loginForm" autocomplete="off">
+    <div class="lk">Conteo físico 2026</div>
+    <h1>Ingrese su código personal</h1>
+    <p class="hint" style="margin:0">Se lo entrega el administrador. Es como su firma: no lo comparta. Todo lo que registre queda a su nombre.</p>
+    <input id="inCode" class="mono" inputmode="text" autocapitalize="characters" spellcheck="false" placeholder="ABC-123" maxlength="9" aria-label="Código personal">
+    <button type="submit" class="btn primary" id="btnLogin">Entrar</button>
+    <div id="loginMsg" class="status warn" hidden></div>
+    <p class="hint" id="devInfo" style="margin:0"></p>
+  </form>
+</div>
+<div class="toast" id="toast" hidden><span id="toastTxt"></span><button type="button" id="toastBtn" hidden></button></div>
+
+<script>window.APP_URL = '<?= ScriptApp.getService().getUrl() ?>';</script>
+<!--APPJS-->
+
+</body>
+</html>

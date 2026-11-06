@@ -1,0 +1,2 @@
+# dist/ se compara por huella MD5: no tocar finales de línea
+dist/** -text
