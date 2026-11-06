@@ -27,14 +27,14 @@ module.exports = function (o) {
   vm.runInContext(`
     Utilities.DigestAlgorithm.MD5 = 'md5';
     (function(){ const old = Utilities.computeDigest; Utilities.computeDigest = (a, s, c) => a === 'md5' ? __md5(s) : old(a, s, c); })();
-    Utilities.base64Encode = b => btoa(String.fromCharCode(...b.map(x => x < 0 ? x + 256 : x)));
+    Utilities.base64Encode = b => { let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.slice(i, i + 0x8000).map(x => x < 0 ? x + 256 : x)); return btoa(s); };
     window.MimeType = { PLAIN_TEXT: 'text/plain' };
     window.UrlFetchApp = { fetch: (url, opt) => { const r = __gh(url); return { getResponseCode: () => r.code, getContentText: () => r.text }; } };
     (function(){
       const FP = Object.getPrototypeOf(DriveApp.getRootFolder()); let n = 0;
       const wrap = f => ({ getId: () => f.id, getName: () => f.n, isTrashed: () => false, setContent: t => { f.text = String(t); }, getBlob: () => ({ getDataAsString: () => f.text || '', getBytes: () => f.bytes }), getParents: () => ({ i: 0, hasNext() { return this.i < 1; }, next() { this.i++; return f.parent; } }) });
       const oc = FP.createFile;
-      FP.createFile = function (a, b, c) { if (typeof a !== 'string') return oc.call(this, a); const id = 'TXT' + (++n); const f = { id, n: a, bytes: [], type: c, text: String(b), parent: this }; __files[id] = f; this.files.push(f); return wrap(f); };
+      FP.createFile = function (a, b, c) { if (typeof a !== 'string') { const r = oc.call(this, a); if (r && !r.getUrl) r.getUrl = () => 'https://drive.google.com/file/d/' + r.getId() + '/view'; return r; } const id = 'TXT' + (++n); const f = { id, n: a, bytes: [], type: c, text: String(b), parent: this }; __files[id] = f; this.files.push(f); return wrap(f); };
       FP.getFilesByName = function (nm) { const L = this.files.filter(f => f.n === nm).map(wrap); let i = 0; return { hasNext: () => i < L.length, next: () => L[i++] }; };
       FP.getName = function () { return this.name; };
       FP.getId = FP.getId || function () { return this.id; };

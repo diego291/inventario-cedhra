@@ -11,7 +11,7 @@
  *   G_ETIQUETADO  → códigos ya etiquetados por ubicación (para avisar si algo cambia)
  */
 var GS = { CFG: 'G_CONFIG', REG: 'G_REGLAS', CAT: 'G_CATALOGO', RUB: 'G_RUBROS', EQ: 'G_EQUIVALENCIAS', INV: 'G_INVENTARIO', RESP: 'RESPONSABLES', ACT: 'ACTAS', TXT: 'G_TEXTOS', ETQ: 'G_ETIQUETADO',
-  PER: 'PERSONAS', TRA: 'TRASLADOS', NOT: 'G_NOTAS', PLA: 'G_PLANTILLAS', JUS: 'G_JUSTIFICACIONES', EXT: 'G_CODIGOS_AGREGADOS' };
+  PER: 'PERSONAS', TRA: 'TRASLADOS', NOT: 'G_NOTAS', PLA: 'G_PLANTILLAS', JUS: 'G_JUSTIFICACIONES', EXT: 'G_CODIGOS_AGREGADOS', CAR: 'G_CARGO_SIGES' };
 var G_HEAD = {
   G_CONFIG: ['Clave', 'Valor', 'Qué es'],
   G_REGLAS: ['Tipo', 'Valor 1', 'Valor 2', 'Nota'],
@@ -27,6 +27,7 @@ var G_HEAD = {
   G_PLANTILLAS: ['Nombre', 'Reporte', 'Configuración (no editar)', 'Creada por', 'Fecha'],
   G_JUSTIFICACIONES: ['Código', 'Justificación', 'Por', 'Fecha'],
   G_CODIGOS_AGREGADOS: ['Código', 'Ubicación donde está', 'Fecha adquisición', 'Valor', 'Serie', 'Observación', 'Agregado por', 'Fecha de registro'],
+  G_CARGO_SIGES: ['Clave', 'Tipo', 'Datos (no editar)', 'Modificado por', 'Fecha'],
   G_TEXTOS: ['Clave', 'Texto', 'Para qué sirve'],
   G_ETIQUETADO: ['Ubicación', 'Fecha', 'Por', 'Códigos (no editar)']
 };
@@ -75,7 +76,7 @@ function gSheet_(name) {
     }
     if (name === GS.TXT) sh.getRange(2, 1, G_TEXTOS_DEF.length, 3).setValues(G_TEXTOS_DEF);
     if (name === GS.INV) sh.getRange('A:H').setNumberFormat('@');
-    if ([GS.CAT, GS.RUB, GS.REG, GS.RESP, GS.EQ, GS.PER, GS.PLA, GS.EXT].indexOf(name) >= 0) sh.getRange(1, 1, sh.getMaxRows(), head.length).setNumberFormat('@');
+    if ([GS.CAT, GS.RUB, GS.REG, GS.RESP, GS.EQ, GS.PER, GS.PLA, GS.EXT, GS.CAR].indexOf(name) >= 0) sh.getRange(1, 1, sh.getMaxRows(), head.length).setNumberFormat('@');
   } else if (name === GS.RESP || name === GS.ACT) {   // hojas creadas por la versión 5: agrega la columna nueva
     var hd = G_HEAD[name], n = hd.length;
     if (sh.getMaxColumns() < n) sh.insertColumnsAfter(sh.getMaxColumns(), n - sh.getMaxColumns());
@@ -159,7 +160,7 @@ function appUrl_() { try { return ScriptApp.getService().getUrl() || ''; } catch
 function api_g_data(tok, knownG) {
   var t0 = Date.now(), u = auth_(tok, 'Supervisor'), gv = getKey_('gver');
   var out = { me: userPublic_(u), gver: gv, regs: gRegs_(), locs: locsOut_(), resp: gResp_(), actas: gActas_(), textos: gTextos_(), etq: gEtq_(),
-    personas: gPersonas_(), traslados: gTraslados_(), notas: gNotas_(u), plantillas: gPlantillas_(), justif: gJustif_(),
+    personas: gPersonas_(), traslados: gTraslados_(), notas: gNotas_(u), plantillas: gPlantillas_(), justif: gJustif_(), cargo: gCargo_(),
     url: appUrl_(), ssId: ss_().getId(), now: Date.now() };
   if (knownG !== gv) out.base = gBase_();
   out.ms = Date.now() - t0;
@@ -884,4 +885,74 @@ function api_sys_revisar() {
   try { if (!c.get('INV1_frc')) { c.put('INV1_frc', '1', 30); c.remove('INV1_chk'); } } catch (e) {}
   var v = null; try { v = typeof version_ === 'function' ? version_() : null; } catch (e) {}
   return { version: v ? v.v : NUCLEO_VERSION, fecha: v ? v.fecha : '' };
+}
+
+/* ================= CARGO MASIVO SIGES (v8.9) =================
+ * Hoja G_CARGO_SIGES: una fila por clave.
+ *   cfg            → ajustes del cargo (asignado a, calidad REGULAR, categorías…)
+ *   r:<registro>   → datos de compra de un lote (un registro del conteo = un lote)
+ *   i:<registro>#k → datos propios de un bien del lote (serie, marca, vehículo, exportado/cargado)
+ * Las claves NO usan el código: los códigos nuevos pueden correrse si cambia el conteo. */
+var CARGO_DIR = 'Cargo masivo SIGES';
+function gCargo_() {
+  var o = { cfg: {}, lote: {}, bien: {} };
+  gRows_(GS.CAR).forEach(function (r) {
+    var k = str_(r[0]).trim(), t = str_(r[1]).trim(), d; if (!k) return;
+    try { d = JSON.parse(str_(r[2]) || '{}'); } catch (e) { return; }
+    if (t === 'cfg') o.cfg = d; else if (t === 'lote') o.lote[k] = d; else if (t === 'bien') o.bien[k] = d;
+  });
+  return o;
+}
+/** Guarda varios cambios: [{k, t:'cfg'|'lote'|'bien', d:{...} | null}]. d = null borra la fila. */
+function api_g_cargoSave(tok, list) {
+  var u = auth_(tok, 'Supervisor');
+  if (!Array.isArray(list) || !list.length) throw valErr_('Nada que guardar.');
+  if (list.length > 3000) throw valErr_('Demasiados cambios de una vez.');
+  list.forEach(function (x) {
+    if (!x || !/^(cfg|r:[^\s]{1,80}|i:[^\s]{1,90})$/.test(String(x.k || ''))) throw valErr_('Clave inválida: ' + (x && x.k));
+    if (['cfg', 'lote', 'bien'].indexOf(x.t) < 0) throw valErr_('Tipo inválido.');
+    if (x.d != null && JSON.stringify(x.d).length > 45000) throw valErr_('Datos demasiado grandes en ' + x.k);
+  });
+  return withLock_(function () {
+    var sh = gSheet_(GS.CAR), rows = gRows_(GS.CAR), at = {}, now = new Date();
+    rows.forEach(function (r, i) { var k = str_(r[0]).trim(); if (k) at[k] = i + 2; });
+    var nuevos = [];
+    list.forEach(function (x) {
+      var val = x.d == null ? ['', '', '', '', ''] : [x.k, x.t, JSON.stringify(x.d), u.nombre, now];
+      if (at[x.k]) sh.getRange(at[x.k], 1, 1, 5).setValues([val]);
+      else if (x.d != null) nuevos.push(val);
+    });
+    if (nuevos.length) { var r0 = sh.getLastRow() + 1; sh.getRange(r0, 1, nuevos.length, 3).setNumberFormat('@'); sh.getRange(r0, 1, nuevos.length, 5).setValues(nuevos); }
+    return { ok: true, cargo: gCargo_() };
+  });
+}
+/** Guarda la plantilla de carga masiva descargada de SIGES (una sola vez; reemplaza la anterior). */
+function api_g_cargoPlantilla(tok, b64, name, listas) {
+  var u = auth_(tok, 'Supervisor');
+  if (String(b64 || '').length > 12000000) throw valErr_('El archivo es demasiado grande (máximo 8 MB).');
+  if (!/\.xlsx$/i.test(String(name || ''))) throw valErr_('La plantilla debe ser el archivo .xlsx que descarga SIGES.');
+  var folder = folderByName_(CARGO_DIR, true), cur = gCargo_().cfg || {};
+  var file = folder.createFile(Utilities.newBlob(Utilities.base64Decode(b64), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'PLANTILLA_SIGES_' + String(name).replace(/[^A-Za-z0-9_.-]/g, '_')));
+  if (cur.plantilla && cur.plantilla.id) { try { DriveApp.getFileById(cur.plantilla.id).setTrashed(true); } catch (e) {} }
+  cur.plantilla = { id: file.getId(), name: String(name).slice(0, 120), t: Date.now(), por: u.nombre };
+  var L = {}; Object.keys(listas || {}).slice(0, 20).forEach(function (k) { if (Array.isArray(listas[k])) L[String(k).slice(0, 20)] = listas[k].slice(0, 300).map(function (x) { return String(x).slice(0, 200); }); });
+  cur.listas = L;
+  log_(u, 'Cargo SIGES: plantilla', '', String(name), u.dev);
+  return api_g_cargoSave(tok, [{ k: 'cfg', t: 'cfg', d: cur }]);
+}
+function api_g_cargoPlantillaGet(tok) {
+  auth_(tok, 'Supervisor');
+  var p = (gCargo_().cfg || {}).plantilla;
+  if (!p || !p.id) throw valErr_('Primero suba la plantilla de carga masiva que descarga de SIGES.');
+  var f; try { f = DriveApp.getFileById(p.id); } catch (e) { throw valErr_('No se encontró la plantilla en Drive. Súbala de nuevo.'); }
+  return { b64: Utilities.base64Encode(f.getBlob().getBytes()), name: p.name };
+}
+/** Guarda en Drive el Excel lleno (copia de respaldo) y devuelve el enlace de descarga. */
+function api_g_cargoGuardar(tok, b64, name, n) {
+  var u = auth_(tok, 'Supervisor');
+  if (String(b64 || '').length > 20000000) throw valErr_('Archivo demasiado grande.');
+  var nm = String(name || 'cargo_masivo.xlsx').replace(/[^A-Za-z0-9_.-]/g, '_');
+  var file = folderByName_(CARGO_DIR, true).createFile(Utilities.newBlob(Utilities.base64Decode(b64), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', nm));
+  log_(u, 'Cargo SIGES: Excel generado', '', nm + ' · ' + (Number(n) || 0) + ' bienes', u.dev);
+  return { ok: true, name: nm, url: file.getUrl(), xlsx: 'https://drive.google.com/uc?export=download&id=' + file.getId() };
 }

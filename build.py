@@ -36,7 +36,7 @@ def pack(shell, js):
     return s.replace('</head>', '<meta name="sistema-version" content="' + ver + '">\n<script>window.SISTEMA_VERSION = ' + json.dumps(ver) + ';</script>\n</head>', 1)
 
 motor = rd('src/motor.js')
-web = ['gestion_core.js', 'gestion_docs.js', 'gestion_ficha.js', 'gestion_ubic.js', 'gestion_reportes.js', 'gestion_inicio.js', 'gestion_config.js']
+web = ['gestion_core.js', 'gestion_docs.js', 'gestion_ficha.js', 'gestion_ubic.js', 'gestion_reportes.js', 'gestion_cargo.js', 'gestion_inicio.js', 'gestion_config.js']
 out = {
     'nucleo': "/* NÚCLEO DEL SISTEMA DE INVENTARIO · generado por build.py — no editar aquí, editar src/ */\nvar NUCLEO_VERSION = '" + ver + "';\n"
               + rd('src/servidor/Code.gs') + '\n' + motor + '\n' + rd('src/servidor/GestionServidor.gs') + '\n',
