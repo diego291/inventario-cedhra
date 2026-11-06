@@ -1,5 +1,5 @@
 /* NÚCLEO DEL SISTEMA DE INVENTARIO · generado por build.py — no editar aquí, editar src/ */
-var NUCLEO_VERSION = '8.7.1';
+var NUCLEO_VERSION = '8.7.2';
 /**
  * CONTEO FÍSICO 2026 · App de captura en Google Sheets + Drive (versión con control de acceso y referencias)
  * Pegue este archivo como Code.gs en Extensiones > Apps Script. El archivo HTML se llama Index.

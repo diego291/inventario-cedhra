@@ -212,13 +212,19 @@ u.conteo{background:var(--ac)}u.cierre{background:var(--ok)}u.actas{background:v
 .dot{width:14px;height:14px;border-radius:50%;border:1px solid var(--ln);cursor:pointer;padding:0}
 .nform{display:flex;flex-direction:column;gap:6px}
 /* ---------- buscador global ---------- */
-#srch{position:fixed;inset:0;background:rgba(20,33,61,.45);z-index:60;display:flex;justify-content:center;align-items:flex-start;padding:56px 16px}
-.srbox{background:var(--sf);border-radius:16px;width:min(1100px,100%);box-shadow:0 24px 60px rgba(0,0,0,.3);overflow:hidden}
-.srin{display:flex;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--ln);font-size:17px}.srin input{flex:1;border:0;font-size:17px;outline:none;background:transparent;min-width:0}.srin input:focus{outline:none}
-.srres{display:grid;grid-template-columns:minmax(0,1fr) 380px;max-height:70vh}
-#srL{overflow:auto;padding:6px}#srP{overflow:auto;padding:14px;border-left:1px solid var(--ln);background:var(--card);display:flex;flex-direction:column;gap:10px}
-#srL .g{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mu);font-weight:700;padding:10px 10px 2px}
-#srL .it{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:10px;font-size:13px;cursor:pointer}#srL .it.on,#srL .it:hover{background:var(--sel)}#srL small{display:block;color:var(--mu);font-size:11.5px}
+#srch{position:fixed;inset:0;background:rgba(20,33,61,.45);z-index:60;display:flex;justify-content:center;align-items:flex-start;padding:48px 16px}
+.srbox{background:var(--sf);border-radius:16px;width:min(1100px,100%);max-height:calc(100vh - 96px);display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.3);overflow:hidden}
+.srin{flex:none;display:flex;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--ln);font-size:17px}.srin input{flex:1;border:0;font-size:17px;outline:none;background:transparent;color:inherit;min-width:0}.srin input:focus{outline:none}
+#srN{font-size:12px;color:var(--mu);white-space:nowrap}
+.srres{flex:1 1 auto;min-height:0;display:flex;max-height:min(620px,calc(100vh - 170px))}#srL{flex:1;min-width:0}#srP{flex:none;width:380px}
+#srL{overflow:auto;padding:6px 8px 10px;min-height:0;position:relative}#srP{overflow:auto;min-height:0;padding:16px;border-left:1px solid var(--ln);background:var(--card);display:flex;flex-direction:column;gap:10px}
+#srL .g{display:flex;justify-content:space-between;align-items:center;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mu);font-weight:700;padding:12px 10px 4px;position:sticky;top:-6px;background:var(--sf);z-index:1}#srL .g em{font-style:normal;background:var(--hov);border-radius:99px;padding:1px 8px;letter-spacing:0}
+#srL .it{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:10px;font-size:13px;cursor:pointer}#srL .it.on{background:var(--sel)}#srL .it .tx{flex:1;min-width:0}#srL .it .d{color:var(--fg)}#srL .it .d::before{content:' · '}#srL small{display:block;color:var(--mu);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#srL .ent{color:var(--mu);font-size:12px;opacity:0}#srL .it.on .ent{opacity:1}
+#srL mark,#srP mark{background:rgba(232,140,40,.32);color:inherit;border-radius:3px;padding:0 1px}
+#srL .more{display:block;margin:2px 10px 6px;border:0;background:none;color:var(--acd);font-weight:600;font-size:12.5px;cursor:pointer;padding:4px 0}
+.srvacio{padding:28px 16px;text-align:center;color:var(--mu);line-height:1.6}.srvacio b{color:var(--fg)}
+.srcard{display:flex;flex-direction:column;gap:6px;align-items:flex-start}.srcard h3{margin:0;font-size:17px}.srcard p{margin:0}
 /* ---------- reportes ---------- */
 .rgrid{display:grid;grid-template-columns:520px minmax(0,1fr);gap:16px;align-items:start}
 .rcfg{display:flex;flex-direction:column;gap:12px;position:sticky;top:12px}
@@ -230,7 +236,7 @@ u.conteo{background:var(--ac)}u.cierre{background:var(--ok)}u.actas{background:v
 .rpv{background:#5E6574;border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:8px;min-width:0}
 .rpv .paper{background:#fff;padding:28px 30px;box-shadow:0 10px 30px rgba(0,0,0,.3);max-height:calc(100vh - 120px);overflow:auto}
 @media (max-width:1250px){.igrid{grid-template-columns:1fr 1fr}.istack{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr}.rgrid{grid-template-columns:1fr}.rcfg{position:static}}
-@media (max-width:1100px){.ugrid{grid-template-columns:1fr}.ulist{position:static;max-height:360px}.g-resp{grid-template-columns:1fr}body.with-panel .main{padding-right:28px}.srres{grid-template-columns:1fr}#srP{display:none}}
+@media (max-width:1100px){.ugrid{grid-template-columns:1fr}.ulist{position:static;max-height:360px}.g-resp{grid-template-columns:1fr}body.with-panel .main{padding-right:28px}#srP{display:none}}
 @media (max-width:860px){.igrid,.istack{grid-template-columns:1fr}.pc .k{grid-template-columns:auto auto}}
 
 /* ---------- impresión ---------- */
@@ -356,6 +362,7 @@ body.dark{--bg:#0E1524;--sf:#162033;--sf2:#1E2A41;--fg:#E6EBF4;--mu:#9AA7BE;--ln
 --card:#1A2438;--hov:#22304A;--hov2:#26344F;--sel:#3A2E1C;--nwb:#3A2A14;--nw:#F0B26B;--acb:#33281A;--acl:#7A5A2E;--note:#3A3418;--noteb:#6B5E25;--reb:#2D2448;--re:#B99AF0;--inpt:#111A2B;color-scheme:dark}
 body.dark input[type=text],body.dark input[type=search],body.dark input[type=number],body.dark input[type=date],body.dark select,body.dark textarea{background:var(--inpt);color:var(--fg)}
 body.dark .modal{background:rgba(0,0,0,.6)}
+body.dark .srin input{background:transparent}body.dark #srL .more{color:var(--ac)}body.dark #srL mark,body.dark #srP mark{background:rgba(232,140,40,.4)}
 body.dark .btn{border-color:var(--ln)}
 body.dark .lpill.on,body.dark .gt.on,body.dark .seg button.on{background:#E6EBF4;color:#0E1524;border-color:#E6EBF4}
 body.dark .lpill.on small,body.dark .gt.on small{color:#4A5670}
@@ -414,7 +421,7 @@ body.dark .toast{box-shadow:0 10px 30px rgba(0,0,0,.5)}
 <aside id="fpanel" class="ovl" hidden></aside>
 <div id="fpop" class="ovl" hidden></div>
 <div id="bloc" class="ovl" hidden></div>
-<div id="srch" class="ovl" hidden><div class="srbox"><div class="srin">🔎 <input id="srQ" type="search" placeholder="Buscar bien, código, serie, ubicación, persona, bloque o nota…" autocomplete="off"><button class="btn sm ghost" data-act="srClose" type="button">Esc</button></div><div class="srres"><div id="srL"></div><div id="srP"></div></div></div></div>
+<div id="srch" class="ovl" hidden><div class="srbox"><div class="srin">🔎 <input id="srQ" type="search" placeholder="Buscar bien, código, serie, ubicación, persona, bloque o nota…" autocomplete="off"><span id="srN"></span><button class="btn sm ghost" data-act="srClose" type="button">Esc</button></div><div class="srres"><div id="srL"></div><div id="srP"></div></div></div></div>
 <div id="modal" class="modal" hidden><div class="box" id="modalBox"></div></div>
 <div id="toast" class="toast" hidden></div>
 <script>window.APP_URL = '<?= ScriptApp.getService().getUrl() ?>';</script>

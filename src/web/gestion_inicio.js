@@ -166,28 +166,84 @@ Object.assign(ACT, {
 INP.blPDone = async el => { const n = D.notas.find(x => x.id === el.dataset.id); try { await blSave(Object.assign({}, n, { hecho: el.checked })); } catch (e) { toast(errMsg(e), true); } };
 
 /* ---------- BUSCADOR GLOBAL (Ctrl+K) ---------- */
-const SR = { q: '', items: [], i: 0 };
+const SR = { q: '', items: [], i: 0, all: {} };
 function openSearch() { $('#srch').hidden = false; const i = $('#srQ'); i.value = SR.q; i.focus(); i.select(); srRun(); }
 function closeSearch() { $('#srch').hidden = true; }
-function srRun() {
-  const q = norm($('#srQ').value); SR.q = $('#srQ').value; const out = [];
-  if (q.length >= 2) {
-    const has = (...v) => v.some(x => norm(x).includes(q));
-    R.cod.forEach((c, i) => { if (out.length < 400 && has(c.B, c.X, c.C, c.H, c.E)) out.push({ g: 'Bienes con código', key: fkeyCod(i), t: c.B, d: `${c.C.replace(/^🔒 /, '')}`, s: `${c.E} · ${c.R === 'NUEVO' ? '✚ Nuevo' : c.R === 'Reciclado' ? '↺ Reciclado' : '🔒 Conservado'} · ${c.F}${c.H ? ' · ' + c.H : ''}` }); });
-    R.inv.forEach(o => { if (o.R === 'Sin asignar' && has(o.code, o.serie, o.desc, o.marca, o.modelo, o.asig)) out.push({ g: 'Inventario anterior (a descargo)', key: fkeyInv(o.code), t: o.code, d: o.desc + (o.marca ? ' ' + o.marca : ''), s: `${o.M} · ⬇ descargo · ${money(o.valor)}${o.serie ? ' · S/N ' + o.serie : ''}` }); });
-    D.locs.forEach(l => { if (has(l.n, l.t, l.z) || respOf(l.n).some(p => has(p.n))) out.push({ g: 'Ubicaciones', ubic: l.n, t: l.n, d: [l.t, l.z].filter(Boolean).join(' · '), s: `${X.estado(l)} · ${sumL(X.byU[norm(l.n)] || [])} bienes · ${respOf(l.n).map(p => shortName(p.n)).join(', ') || 'sin responsable'}` }); });
-    (D.personas || []).forEach(p => { if (has(p.n, p.dui, p.nip, p.cargo)) out.push({ g: 'Personas', per: p.id, t: p.n, d: p.cargo, s: `${p.dui ? 'DUI ' + p.dui : 'sin DUI'}${p.nip ? ' · NIP ' + p.nip : ''} · ${(X.perUb[p.id] || []).map(x => x.u).join(', ') || 'sin ubicación'}` }); });
-    R.cat.forEach(c => { if (!c.blank && has(c.A, c.F)) out.push({ g: 'Catálogo', blk: c.A, t: c.A + ' · ' + c.F, d: c.C, s: `${c.I} contados · ${c.M} en sistema` }); });
-    (D.notas || []).forEach(n => { if (n.tipo !== 'borrador' && has(n.texto, n.vinc)) out.push({ g: 'Notas y agenda', nota: n, t: n.texto.slice(0, 80), d: n.tipo === 'actividad' ? dmy(n.fecha) + ' ' + (n.hora || '') : n.tipo, s: n.por }); });
+/* Búsqueda por palabras: todas deben aparecer (en cualquier orden). Los códigos se comparan también sin guiones. */
+function srTokens(q) { return norm(q).split(' ').filter(Boolean); }
+function srScore(toks, campos) {
+  const txt = campos.map(norm).join(' | '), dig = campos.map(x => String(x ?? '').replace(/\D/g, '')).join('|');
+  let sc = 0;
+  for (const t of toks) {
+    const td = t.replace(/\D/g, ''), esNum = td.length >= 3 && td.length === t.replace(/[-\s]/g, '').length;
+    let ok = txt.includes(t) || (esNum && dig.includes(td));
+    if (!ok) return 0;
+    const n0 = norm(campos[0]);
+    if (n0 === t || (esNum && String(campos[0] ?? '').replace(/\D/g, '') === td)) sc += 100;
+    else if (n0.startsWith(t) || (' ' + n0).includes(' ' + t)) sc += 20;
+    else if (n0.includes(t) || (esNum && String(campos[0] ?? '').replace(/\D/g, '').endsWith(td))) sc += 10;
+    else sc += 3;
   }
-  const lim = {}, items = out.filter(x => { lim[x.g] = (lim[x.g] || 0) + 1; return lim[x.g] <= 8; });
-  SR.items = items; SR.i = 0; SR.tot = out.length;
-  let g = '';
-  $('#srL').innerHTML = q.length < 2 ? '<div class="hint" style="padding:14px">Escriba al menos 2 letras. Use ↑ ↓ y Enter para elegir · Esc para cerrar.</div>' : items.map((x, i) => { const h = x.g !== g ? `<div class="g">${esc(x.g)} (${out.filter(y => y.g === x.g).length})</div>` : ''; g = x.g; return h + `<div class="it${i === 0 ? ' on' : ''}" data-act="srPick" data-i="${i}"><div style="flex:1;min-width:0"><b class="${x.key ? 'mono' : ''}">${esc(x.t)}</b>${x.d ? ' · ' + esc(x.d) : ''}<small>${esc(x.s)}</small></div>${i === 0 ? '<span class="hint">Enter ↵</span>' : ''}</div>`; }).join('') || '<div class="hint" style="padding:14px">Sin resultados.</div>';
+  return sc;
+}
+function srMark(s, toks) {
+  let h = esc(s); if (!toks.length) return h;
+  const raw = String(s ?? ''), base = raw.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
+  const marks = new Array(raw.length).fill(false);
+  toks.forEach(t => { let i = base.indexOf(t); while (t && i >= 0) { for (let k = i; k < i + t.length; k++) marks[k] = true; i = base.indexOf(t, i + 1); } });
+  if (base.length !== raw.length || !marks.some(Boolean)) return h;
+  let out = '', on = false;
+  for (let k = 0; k < raw.length; k++) { if (marks[k] !== on) { out += marks[k] ? '<mark>' : '</mark>'; on = marks[k]; } out += esc(raw[k]); }
+  return out + (on ? '</mark>' : '');
+}
+const SR_ORDEN = ['Bienes con código', 'Inventario anterior (a descargo)', 'Ubicaciones', 'Personas', 'Catálogo', 'Notas y agenda'];
+function srRun() {
+  SR.q = $('#srQ').value; const toks = srTokens(SR.q), out = [];
+  const qlen = toks.join('').length;
+  if (qlen >= 2) {
+    const add = (sc, x) => { if (sc) { x.sc = sc; out.push(x); } };
+    R.cod.forEach((c, i) => add(srScore(toks, [c.B, c.X, c.C, c.H, c.E, c.F]), { g: SR_ORDEN[0], key: fkeyCod(i), t: c.B, d: c.C.replace(/^🔒 /, ''), s: `${c.E} · ${c.R === 'NUEVO' ? '✚ Nuevo' : c.R === 'Reciclado' ? '↺ Reciclado' : '🔒 Conservado'} · ${c.F}${c.H ? ' · ' + c.H : ''}` }));
+    R.inv.forEach(o => { if (o.R === 'Sin asignar') add(srScore(toks, [o.code, o.desc, o.serie, o.marca, o.modelo, o.asig, o.M]), { g: SR_ORDEN[1], key: fkeyInv(o.code), t: o.code, d: o.desc + (o.marca ? ' ' + o.marca : ''), s: `${o.M} · ⬇ descargo · ${money(o.valor)}${o.serie ? ' · S/N ' + o.serie : ''}` }); });
+    D.locs.forEach(l => add(srScore(toks, [l.n, l.t, l.z, respOf(l.n).map(p => p.n).join(' ')]), { g: SR_ORDEN[2], ubic: l.n, t: l.n, d: [l.t, l.z].filter(Boolean).join(' · '), s: `${X.estado(l)} · ${sumL(X.byU[norm(l.n)] || [])} bienes · ${respOf(l.n).map(p => shortName(p.n)).join(', ') || 'sin responsable'}` }));
+    (D.personas || []).forEach(p => add(srScore(toks, [p.n, p.cargo, p.dui, p.nip]), { g: SR_ORDEN[3], per: p.id, t: p.n, d: p.cargo, s: `${p.dui ? 'DUI ' + p.dui : 'sin DUI'}${p.nip ? ' · NIP ' + p.nip : ''} · ${(X.perUb[p.id] || []).map(x => x.u).join(', ') || 'sin ubicación'}` }));
+    R.cat.forEach(c => { if (!c.blank) add(srScore(toks, [c.A, c.F, c.C]), { g: SR_ORDEN[4], blk: c.A, t: c.A + ' · ' + c.F, d: c.C, s: `${c.I} contados · ${c.M} en sistema` }); });
+    (D.notas || []).forEach(n => { if (n.tipo !== 'borrador') add(srScore(toks, [n.texto, n.vinc]), { g: SR_ORDEN[5], nota: n, t: n.texto.slice(0, 80), d: n.tipo === 'actividad' ? dmy(n.fecha) + ' ' + (n.hora || '') : n.tipo, s: n.por }); });
+  }
+  // Grupos ordenados por su mejor coincidencia; dentro, por puntaje y luego por código/nombre.
+  const grupos = {}; out.forEach(x => (grupos[x.g] = grupos[x.g] || []).push(x));
+  Object.values(grupos).forEach(a => a.sort((x, y) => y.sc - x.sc || String(x.t).localeCompare(String(y.t), 'es', { numeric: true })));
+  const orden = Object.keys(grupos).sort((a, b) => grupos[b][0].sc - grupos[a][0].sc || SR_ORDEN.indexOf(a) - SR_ORDEN.indexOf(b));
+  const items = []; let html = '';
+  orden.forEach(g => {
+    const a = grupos[g], lim = SR.all[g] ? 200 : 6, vis = a.slice(0, lim);
+    html += `<div class="g"><span>${esc(g)}</span><em>${a.length}</em></div>`;
+    vis.forEach(x => { const i = items.length; items.push(x); html += `<div class="it" data-act="srPick" data-i="${i}"><div class="tx"><b class="${x.key ? 'mono' : ''}">${srMark(x.t, toks)}</b>${x.d ? `<span class="d">${srMark(x.d, toks)}</span>` : ''}<small>${srMark(x.s, toks)}</small></div><span class="ent">↵</span></div>`; });
+    if (a.length > lim) html += `<button class="more" type="button" data-act="srMas" data-g="${esc(g)}">Ver los ${a.length} de ${esc(g.toLowerCase())} ▾</button>`;
+    else if (SR.all[g] && a.length > 6) html += `<button class="more" type="button" data-act="srMas" data-g="${esc(g)}">Ver menos ▴</button>`;
+  });
+  SR.items = items; SR.i = Math.min(SR.i, Math.max(0, items.length - 1)); SR.tot = out.length;
+  const L = $('#srL');
+  L.innerHTML = qlen < 2 ? '<div class="srvacio">Escriba al menos 2 letras o números.<br><small>Puede combinar palabras: <b>mesa biblioteca</b>, <b>1121 15</b>, <b>silla A1</b>.</small></div>'
+    : html || `<div class="srvacio">Sin resultados para “${esc(SR.q)}”.<br><small>Pruebe con menos palabras o solo una parte del código.</small></div>`;
+  $('#srN').textContent = qlen < 2 ? '' : out.length + (out.length === 1 ? ' resultado' : ' resultados');
+  srSel(SR.i, false);
+}
+function srSel(i, ver) {
+  const its = $$('#srL .it'); SR.i = i;
+  its.forEach((e, k) => e.classList.toggle('on', k === i));
+  const el = its[i], L = $('#srL');
+  if (el && ver) { const t = el.offsetTop, b = t + el.offsetHeight; if (t < L.scrollTop + 30) L.scrollTop = Math.max(0, t - 30); else if (b > L.scrollTop + L.clientHeight) L.scrollTop = b - L.clientHeight + 6; }
   srPreview();
 }
-function srPreview() { const x = SR.items[SR.i], p = $('#srP'); if (!x || !x.key) { p.innerHTML = '<div class="hint">La ficha del bien aparece aquí.</div>'; return; } const f = fichaData(x.key); if (f) { p.innerHTML = fichaCompact(f).replace(/<button class="btn sm ghost" data-act="fclose"[^>]*>✕<\/button>/, ''); cargarFotos(p); } }
-function srMove(d) { const its = $$('#srL .it'); if (!its.length) return; SR.i = Math.max(0, Math.min(its.length - 1, SR.i + d)); its.forEach((e, i) => e.classList.toggle('on', i === SR.i)); its[SR.i].scrollIntoView({ block: 'nearest' }); srPreview(); }
+function srPreview() {
+  const x = SR.items[SR.i], p = $('#srP'); p.scrollTop = 0;
+  if (!x) { p.innerHTML = '<div class="srvacio"><small>La ficha del resultado aparece aquí.</small></div>'; return; }
+  if (x.key) { const f = fichaData(x.key); if (f) { p.innerHTML = fichaCompact(f).replace(/<button class="btn sm ghost" data-act="fclose"[^>]*>✕<\/button>/, ''); cargarFotos(p); } return; }
+  const que = x.ubic ? 'Abrir la ubicación' : x.per ? 'Ver a la persona' : x.blk ? 'Ver en el catálogo' : 'Abrir';
+  p.innerHTML = `<div class="srcard"><span class="lbl">${esc(x.g)}</span><h3>${esc(x.t)}</h3>${x.d ? `<p>${esc(x.d)}</p>` : ''}<p class="hint">${esc(x.s || '')}</p><button class="btn sm pri" type="button" data-act="srPick" data-i="${SR.i}">${que} →</button></div>`;
+}
+function srMove(d) { if (!SR.items.length) return; srSel(Math.max(0, Math.min(SR.items.length - 1, SR.i + d)), true); }
+ACT.srMas = b => { const g = b.dataset.g; SR.all[g] = !SR.all[g]; srRun(); };
 function srOpen(x) {
   closeSearch(); if (!x) return;
   if (x.key) { openFicha(x.key, SR.items.filter(y => y.key).map(y => y.key)); }
@@ -203,5 +259,6 @@ document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'n') { if (D && !$('#app').hidden) { e.preventDefault(); toggleBloc(); } }
   if (!$('#srch').hidden) { if (e.key === 'ArrowDown') { e.preventDefault(); srMove(1); } if (e.key === 'ArrowUp') { e.preventDefault(); srMove(-1); } if (e.key === 'Enter') { e.preventDefault(); srOpen(SR.items[SR.i]); } }
 });
-$('#srQ').addEventListener('input', debounce(srRun, 120));
+$('#srQ').addEventListener('input', debounce(() => { SR.i = 0; SR.all = {}; $('#srL').scrollTop = 0; srRun(); }, 120));
+$('#srL').addEventListener('mousemove', e => { const it = e.target.closest('.it'); if (!it) return; const i = +it.dataset.i; if (i !== SR.i) srSel(i, false); });
 $('#srch').addEventListener('mousedown', e => { if (e.target.id === 'srch') closeSearch(); });
