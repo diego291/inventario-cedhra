@@ -23,8 +23,25 @@ MODS.ubic = {
       <div class="card udet" id="uDet">${this.detail(s.sel)}</div></div>`;
   },
   list(L) {
-    return L.map(l => { const k = norm(l.n), rs = respOf(l.n), nb = sumL(X.byU[k] || []);
-      return `<div class="lrow${norm(UI.ubic.sel) === k ? ' on' : ''}" data-act="uSel" data-u="${esc(l.n)}"><div style="flex:1;min-width:0"><b>${esc(l.n)}</b>${l.nueva ? ' <span class="chip new">Nueva</span>' : ''}${!l.a && !l.nueva ? ' <span class="chip">Inactiva</span>' : ''}<small>${esc([l.t, l.z].filter(Boolean).join(' · '))} · ${nb} bienes · ${rs.length ? rs.length + ' firma(s)' : 'sin responsable'}</small></div>${estChip(l)}</div>`; }).join('') || '<div class="empty">Nada con ese filtro.</div>';
+    if (!L.length) return '<div class="empty">Nada con ese filtro.</div>';
+    const s = UI.ubic, q = !!norm(s.q), selG = s.sel ? cGrupoDe(s.sel) : '';
+    if (!s.open) s.open = {};
+    const gs = new Map();
+    L.forEach(l => { const k = cGrupoDe(l.n), n = k[0] === 'z' ? String(l.z).trim() : k.slice(2); if (!gs.has(k)) gs.set(k, { k, n, ls: [] }); gs.get(k).ls.push(l); });
+    const orden = k => k[0] === 'z' ? 0 : /Otras$/.test(k) ? 2 : 1;
+    const G = [...gs.values()].sort((a, b) => orden(a.k) - orden(b.k) || (orden(a.k) === 0 ? a.n.localeCompare(b.n, 'es') : 0));
+    return G.map(g => {
+      const abierto = q || (g.k in s.open ? s.open[g.k] : g.k === selG), nb = g.ls.reduce((a, l) => a + sumL(X.byU[norm(l.n)] || []), 0);
+      const cerr = g.ls.filter(l => l.cerrada).length;
+      return `<div class="uacc${abierto ? ' open' : ''}"><button type="button" class="uah" data-act="uGrp" data-g="${esc(g.k)}"><span class="car">${abierto ? '▾' : '▸'}</span><b>${esc(g.n)}</b><small>${g.ls.length} · ${fmtN(nb)} bienes${cerr ? ` · ✓${cerr}` : ''}</small></button>
+        ${abierto ? g.ls.map(l => this.row(l)).join('') : ''}</div>`;
+    }).join('');
+  },
+  row(l) {
+    const k = norm(l.n), rs = respOf(l.n), nb = sumL(X.byU[k] || []), e = X.estado(l), ac = X.actU[k] || [], firm = ac.some(a => a.firmada || a.firm);
+    const dot = !l.a && !l.nueva ? 'off' : e;
+    const tag = l.cerrada ? (firm ? '<span class="chip ok" title="Acta firmada">✓ ✍</span>' : ac.length ? '<span class="chip in" title="Acta generada">✓ 📄</span>' : '<span class="chip ok">✓</span>') : e === 'revision' ? '<span class="chip in">🔔</span>' : '';
+    return `<div class="lrow${norm(UI.ubic.sel) === k ? ' on' : ''}" data-act="uSel" data-u="${esc(l.n)}"><span class="udot d-${dot}" title="${esc(dot)}"></span><div style="flex:1;min-width:0"><b>${esc(l.n)}</b>${l.nueva ? ' <span class="chip new">Nueva</span>' : ''}${!l.a && !l.nueva ? ' <span class="chip">Inactiva</span>' : ''}<small>${nb} bienes · ${rs.length ? rs.length + ' firma(s)' : '<span style="color:var(--wa)">sin responsable</span>'}</small></div>${tag}</div>`;
   },
   detail(u) {
     const l = X.loc[norm(u)]; if (!l) return '<div class="empty">Elija una ubicación de la lista.</div>';
@@ -36,8 +53,19 @@ MODS.ubic = {
     return `<div class="row"><div style="flex:1;min-width:0"><div class="row" style="gap:8px"><h2 style="font-size:22px;margin:0">${esc(nombreUbic(u))}</h2>${l.cerrada ? `<span class="chip ok">✓ Cerrada${rev}</span>` : estChip(l)}${folio ? `<span class="chip in">Folio ${esc(folio)}</span>` : ''}</div>
       <div class="hint">${esc([l.t, l.z].filter(Boolean).join(' · ') || 'Sin tipo ni edificio')} · ${nb} bienes · ${rows.length} registros${conts.length ? ' · contado por ' + esc(conts.join(', ')) : ''}${f1.length ? ' · ' + esc(dmy(f1[0])) + (f1[0] !== f1[f1.length - 1] ? ' al ' + esc(dmy(f1[f1.length - 1])) : '') : ''}</div></div>
       <button class="btn sm" data-act="uEdit" type="button">✎ Editar datos</button>${l.a ? `<button class="btn sm bad" data-act="uAct" data-on="0" type="button">Desactivar</button>` : `<button class="btn sm" data-act="uAct" data-on="1" type="button">Activar</button>`}${isAdmin() && !rows.length && !(X.actU[k] || []).length ? '<button class="btn sm bad" data-act="uDel" type="button">🗑 Eliminar</button>' : ''}</div>
-      <div class="tabs">${tabs.map(([t, x]) => `<button type="button" data-act="uTab" data-k="${t}" class="${tab === t ? 'on' : ''}">${x}</button>`).join('')}</div>
+      ${this.pasos(u, l, rs)}
+      <div class="tabs">${tabs.map(([t, x]) => `<button type="button" data-act="uTab" data-k="${t}" class="${tab === t ? 'on' : ''}">${x}</button>`).join('')}<span style="flex:1"></span>${this.nav(u)}</div>
       <div id="uTabBody">${this['t_' + tab](u, l, { rows, cs, rs, falt })}</div>`;
+  },
+  pasos(u, l, rs) {
+    const k = norm(u), ac = X.actU[k] || [], firm = ac.some(a => a.firmada || a.firm), etq = (D.etq || []).some(x => norm(x.u) === k);
+    const P = [['Conteo cerrado', l.cerrada], ['Responsables', rs.length > 0], ['Acta generada', ac.length > 0], ['Acta firmada', firm], ['Etiquetado', etq]];
+    const sig = P.findIndex(p => !p[1]);
+    return `<div class="upasos">${P.map(([t, ok], i) => `<span class="upaso ${ok ? 'ok' : i === sig ? 'sig' : ''}">${i + 1} · ${t}${ok ? ' ✓' : i === sig ? ' — pendiente' : ''}</span>`).join('')}</div>`;
+  },
+  nav(u) {
+    const all = ordenLista(), i = all.findIndex(l => norm(l.n) === norm(u)), a = all[i - 1], b = all[i + 1];
+    return `<div class="row" style="gap:6px;align-self:center">${a ? `<button class="btn sm" data-act="uSel" data-u="${esc(a.n)}" type="button" title="Anterior">◀ ${esc(a.n)}</button>` : ''}${b ? `<button class="btn sm" data-act="uSel" data-u="${esc(b.n)}" type="button" title="Siguiente">${esc(b.n)} ▶</button>` : ''}</div>`;
   },
   t_res(u, l, d) {
     const by = { Conservado: 0, Reciclado: 0, NUEVO: 0 }; d.cs.forEach(c => by[c.R]++);
@@ -45,8 +73,9 @@ MODS.ubic = {
     const al = d.rows.filter(r => r.V && r.V.charAt(0) !== 'ℹ'), notas = X.notaVinc[U(u)] || [];
     return `<div class="grid g4"><div class="kpi"><span>Bienes contados</span><b>${B + Rr + M}</b><small>B ${B} · R ${Rr} · M ${M}</small></div><div class="kpi"><span>Códigos</span><b>${d.cs.length}</b><small>🔒 ${by.Conservado} · ↺ ${by.Reciclado} · ✚ ${by.NUEVO}</small></div>
       <div class="kpi"><span>Había en el sistema</span><b>${inv}</b><small>según “Asignado a”</small></div><div class="kpi"><span>No aparecieron</span><b style="color:${d.falt.length ? 'var(--bad)' : 'var(--ok)'}">${d.falt.length}</b><small>pasan a descargo</small></div></div>
-      ${al.length ? `<div class="banner wa"><b>${al.length} alerta(s) en el conteo de esta ubicación.</b><button class="btn sm" data-act="go" data-m="conteo" data-u="${esc(u)}" type="button">Ver en Conteo</button></div>` : ''}
-      <div class="card" style="box-shadow:none"><h2>Lo que había aquí y no apareció <span class="meta">justifique antes de mandarlo a descargo</span></h2>
+      ${al.length || d.falt.length ? `<div class="uatn">${al.length ? `<div><b>⚠ ${al.length} alerta(s) en el conteo</b><button class="btn sm" data-act="go" data-m="conteo" data-u="${esc(u)}" type="button">Ver en Conteo</button></div>` : '<div><span class="hint">Sin alertas en el conteo</span></div>'}
+        ${d.falt.length ? `<div><b>${d.falt.length} no aparecieron</b>${(() => { const sj = d.falt.filter(o => !(D.justif || {})[o.code]).length; return sj ? `<span class="hint">${sj} sin justificar</span>` : '<span class="chip ok">todas justificadas</span>'; })()}<button class="btn sm" data-act="uJus" type="button">Justificar ↓</button></div>` : ''}</div>` : ''}
+      <div class="card" style="box-shadow:none" id="uFalt"><h2>Lo que había aquí y no apareció <span class="meta">justifique antes de mandarlo a descargo</span></h2>
       ${d.falt.length ? `<div class="tw" style="max-height:340px"><table class="t"><thead><tr><th>Código</th><th>Bien</th><th>Fecha</th><th class="n">Valor</th><th>Justificación</th></tr></thead><tbody>${d.falt.map(o => { const j = (D.justif || {})[o.code]; return `<tr class="click" data-act="finv" data-code="${esc(o.code)}"><td class="code">${esc(o.code)}</td><td>${esc(o.desc)}<br><span class="hint">${esc([o.marca, o.modelo, o.serie].filter(Boolean).join(' '))}</span></td><td>${esc(dmy(o.fecha))}</td><td class="n">${money(o.valor)}</td><td>${j && j.t ? esc(j.t) : '<span class="chip wa">Sin justificar</span>'} <button class="btn sm ghost" data-act="fjust" data-key="i:${esc(o.code)}" type="button">✎</button></td></tr>`; }).join('')}</tbody></table></div>` : '<div class="hint">Todo lo que el sistema tenía en esta ubicación apareció en el conteo (o no tiene equivalencia de ubicación).</div>'}</div>
       ${notas.length ? `<div class="card" style="box-shadow:none"><h2>Notas</h2>${notas.map(n => `<div class="note-s">${esc(n.texto)} <span class="hint">· ${esc(n.por)}</span></div>`).join('')}</div>` : ''}
       <div><button class="btn sm" data-act="unota" type="button">📝 Nota para esta ubicación</button></div>`;
@@ -97,7 +126,11 @@ async function cargarHist(u) {
 INP.uQ = debounce(el => { UI.ubic.q = el.value; const q = norm(el.value); $('#uL').innerHTML = MODS.ubic.list(ordenLista().filter(l => ubicFiltro(l) && (!q || norm(l.n).includes(q) || norm(l.t + ' ' + l.z).includes(q) || respOf(l.n).some(p => norm(p.n).includes(q))))); }, 200);
 Object.assign(ACT, {
   uF: b => { UI.ubic.f = b.dataset.k; render(); },
-  uSel: b => { UI.ubic.sel = b.dataset.u; $$('#uL .lrow').forEach(x => x.classList.toggle('on', x === b)); $('#uDet').innerHTML = MODS.ubic.detail(b.dataset.u); if (innerWidth < 1100) $('#uDet').scrollIntoView({ behavior: 'smooth' }); },
+  uGrp: b => { const s = UI.ubic, k = b.dataset.g, selG = s.sel ? cGrupoDe(s.sel) : ''; s.open = s.open || {}; const cur = k in s.open ? s.open[k] : k === selG; s.open[k] = !cur; const q = norm(s.q); $('#uL').innerHTML = MODS.ubic.list(ordenLista().filter(l => ubicFiltro(l) && (!q || norm(l.n).includes(q) || norm(l.t + ' ' + l.z).includes(q) || respOf(l.n).some(p => norm(p.n).includes(q))))); },
+  uJus: () => { const t = $('#uFalt'); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
+  uSel: b => { UI.ubic.sel = b.dataset.u; const g = cGrupoDe(b.dataset.u); UI.ubic.open = UI.ubic.open || {}; if (UI.ubic.open[g] === false) delete UI.ubic.open[g];
+    const q = norm(UI.ubic.q); $('#uL').innerHTML = MODS.ubic.list(ordenLista().filter(l => ubicFiltro(l) && (!q || norm(l.n).includes(q) || norm(l.t + ' ' + l.z).includes(q) || respOf(l.n).some(p => norm(p.n).includes(q)))));
+    $('#uDet').innerHTML = MODS.ubic.detail(b.dataset.u); const on = $('#uL .lrow.on'); if (on) on.scrollIntoView({ block: 'nearest' }); if (innerWidth < 1100) $('#uDet').scrollIntoView({ behavior: 'smooth' }); else $('#uDet').scrollIntoView({ block: 'nearest' }); },
   uTab: b => { UI.ubic.tab = b.dataset.k; $('#uDet').innerHTML = MODS.ubic.detail(UI.ubic.sel); },
   uNew: () => locModal(null), uEdit: () => locModal(X.loc[norm(UI.ubic.sel)]),
   uAct: async b => { b.disabled = true; try { const r = await api('api_g_locSave', { orig: UI.ubic.sel, n: UI.ubic.sel, a: b.dataset.on === '1' }); D.locs = r.locs; recompute(); render(); toast(b.dataset.on === '1' ? 'Ubicación activada' : 'Ubicación desactivada: ya no cuenta para el avance'); } catch (e) { toast(errMsg(e), true); b.disabled = false; } },

@@ -314,6 +314,23 @@ table.ct td{padding:13px 14px}table.ct th{padding:11px 14px}
 
 .exform.editing{outline:2px solid var(--ac);background:#FFF6E8}
 @media (max-width:900px){.exform{grid-template-columns:1fr 1fr}}
+/* Ubicaciones v8.5: lista por grupos que se pliegan + detalle con pasos */
+.ugrid{gap:20px;grid-template-columns:330px minmax(0,1fr)}
+.ulist{padding:14px;gap:10px}
+.ulist #uL{gap:8px}
+.uacc{border:1px solid var(--ln);border-radius:12px;overflow:hidden;background:var(--sf)}
+.uah{display:flex;align-items:center;gap:8px;width:100%;border:0;background:var(--sf2);padding:10px 12px;font:inherit;color:var(--fg);cursor:pointer;text-align:left}
+.uah b{font-size:13.5px}.uah small{margin-left:auto;color:var(--mu);font-size:11.5px;white-space:nowrap}.uah .car{color:var(--mu);width:12px}
+.uah:hover{background:#ECE6D8}
+.uacc .lrow{border-radius:0;border:0;border-top:1px solid var(--ln);padding:8px 12px}
+.udot{width:10px;height:10px;border-radius:50%;flex:none;background:var(--ln)}
+.udot.d-cerrada{background:var(--ok)}.udot.d-revision{background:var(--in)}.udot.d-proceso{background:var(--ac)}.udot.d-off{background:transparent;border:2px solid var(--ln)}
+.udet{padding:22px 24px;gap:16px}
+.upasos{display:flex;gap:6px;flex-wrap:wrap}
+.upaso{font-size:12px;font-weight:700;border-radius:999px;padding:3px 10px;background:var(--sf2);color:var(--mu)}
+.upaso.ok{background:var(--okb);color:var(--ok)}.upaso.sig{background:#FCE7CF;color:#9A5410}
+.uatn{display:flex;gap:12px;flex-wrap:wrap;justify-content:space-between;align-items:center;background:#FFF2E0;border:1.5px dashed #E8B472;border-radius:12px;padding:12px 14px}
+.uatn>div{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.uatn b{color:#9A5410}
 </style>
 <style id="pageStyle">@page{size:letter;margin:12mm}</style>
 </head>
