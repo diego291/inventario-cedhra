@@ -239,7 +239,9 @@ MODS.conteo = {
       <span class="hint">${fmtN(B.length)} registros · ${fmtN(bienes)} bienes</span><span style="flex:1"></span>
       <input type="search" data-in="cQ" value="${esc(s.q)}" placeholder="🔎 Bien, etiqueta, serie, código…" style="min-width:240px;flex:0 1 340px">
       <div class="seg"><button type="button" data-act="cV" data-v="tabla" class="${v === 'tabla' ? 'on' : ''}">☰ Tabla</button><button type="button" data-act="cV" data-v="tablero" class="${v === 'tablero' ? 'on' : ''}">▦ Tablero</button></div></div>
-      <div class="ckps">${kp('', bienes, 'Todos', fmtN(B.length) + ' registros')}${kp('cons', co, '🔒 Conservan', cnt.cons[0] + ' registros')}${kp('rec', cr, '↺ Reciclan', cnt.rec[0] + ' registros')}${kp('nw', cn, '✚ Nuevos', cnt.nw[0] + ' registros')}${kp('reet', cnt.reet[1], '⇄ Re-etiquetar', cnt.reet[0] + ' registros')}${kp('alerta', cnt.alerta[0], '⚠ Revisar', 'registros')}</div></div>
+      <div class="ckps"><div class="ckg"><span class="ckgl">Total</span><div class="ckgr">${kp('', bienes, 'Todos', fmtN(B.length) + ' registros')}</div></div>
+        <div class="ckg"><span class="ckgl">Código que reciben · ${fmtN(co)} + ${fmtN(cr)} + ${fmtN(cn)} = ${fmtN(co + cr + cn)} bienes</span><div class="ckgr c3">${kp('cons', co, '🔒 Conservan', cnt.cons[0] + ' registros')}${kp('rec', cr, '↺ Reciclan', cnt.rec[0] + ' registros')}${kp('nw', cn, '✚ Nuevos', cnt.nw[0] + ' registros')}</div></div>
+        <div class="ckg pend"><span class="ckgl">Pendientes · ya incluidos en los de la izquierda</span><div class="ckgr c2">${kp('reet', cnt.reet[1], '⇄ Re-etiquetar', cnt.reet[0] + ' registros')}${kp('alerta', cnt.alerta[1], '⚠ Revisar', cnt.alerta[0] + ' registros')}</div></div></div></div>
     <div id="cTable">${v === 'tablero' ? this.board(L) : this.table(L)}</div>`;
   },
   locs() {
