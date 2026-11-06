@@ -164,35 +164,92 @@ const ubicOpts = (sel, todas = 'Todas las ubicaciones') => `<option value="">${t
   + R.logical.filter(r => r.C && !X.loc[norm(r.C)]).map(r => r.C).filter((v, i, a) => a.indexOf(v) === i).map(n => `<option value="${esc(n)}"${norm(sel) === norm(n) ? ' selected' : ''}>${esc(n)} (no está en la lista)</option>`).join('');
 const estChip = l => { if (!l) return '<span class="chip bad">No está en la lista</span>'; const e = X.estado(l); return e === 'cerrada' ? '<span class="chip ok">✓ Cerrada</span>' : e === 'revision' ? '<span class="chip in">🔔 En revisión</span>' : e === 'proceso' ? '<span class="chip wa">En proceso</span>' : '<span class="chip">Pendiente</span>'; };
 const origenChip = o => o === 'Conservado' ? '<span class="chip ok">🔒 Conservado</span>' : o === 'Reciclado' ? '<span class="chip in">↺ Reciclado</span>' : '<span class="chip new">✚ Nuevo</span>';
-const alertHtml = v => !v ? '' : `<span class="alert${/^ℹ/.test(v) ? ' info' : /no existe|Serie repetida|Esa etiqueta ya|otra familia|no se reconoce|Falta|cantidad debe|otro bloque|ya registrad/i.test(v) ? ' bad' : ''}">${esc(v)}</span>`;
+const ALERT_BAD = /no existe|Serie repetida|Esa etiqueta ya|otra familia|no se reconoce|Falta|cantidad debe|otro bloque|ya registrad/i;
+const alertHtml = v => !v ? '' : `<span class="alert${/^ℹ/.test(v) ? ' info' : ALERT_BAD.test(v) ? ' bad' : ''}">${esc(v)}</span>`;
 const sumL = rows => rows.reduce((a, r) => a + N0(r.L), 0);
 
 const invChip = o => o.R === 'Conservado' ? '<span class="chip ok">🔒 Conservado</span>' : o.R === 'Reasignado' ? '<span class="chip in">↺ Reasignado</span>' : '<span class="chip bad">⬇ Descargo</span>';
 const rango = r => !r.M ? '<span class="hint">—</span>' : (r.M === r.N ? esc(r.M) : esc(r.M) + '<br>' + esc(r.N));
 
 /* ===================== CONTEO ===================== */
+/* ===================== CONTEO (v8.1: tabla + tablero, ubicaciones arriba) ===================== */
+// Clasifica cada registro por lo que le pasó: cons (conserva), rec (recicla), nw (nuevo), reet (re-etiquetar), alerta (revisar).
+const CK = { cons: ['🔒', 'Conservan', 'ok'], rec: ['↺', 'Reciclan', 'in'], nw: ['✚', 'Nuevos', 'new'], reet: ['⇄', 'Re-etiquetar', 're'], alerta: ['⚠', 'Revisar', 'bad'] };
+function cKinds() {
+  if (cKinds.R === R) return cKinds.m;
+  const by = new Map(); R.cod.forEach(c => { const a = by.get(c.row); if (a) a.push(c); else by.set(c.row, [c]); });
+  const m = new Map();
+  R.logical.forEach(r => {
+    const cs = by.get(r) || [], o = cs.filter(c => c.R === 'Conservado').length, rc = cs.filter(c => c.R === 'Reciclado').length, nw = cs.length - o - rc, L = N0(r.L);
+    const malo = !cs.length || (!!r.V && ALERT_BAD.test(r.V) && !(r.AR && cs.length));
+    const k = malo ? 'alerta' : r.AR ? 'reet' : o ? 'cons' : rc ? 'rec' : 'nw';
+    m.set(r, { k, o, rc, nw, cs, L });
+  });
+  cKinds.R = R; cKinds.m = m; return m;
+}
+const cVista = () => UI.conteo.v || (UI.conteo.v = LS.get('cview', 'tabla'));
+const brmBar = (r, w) => { const t = Math.max(N0(r.I) + N0(r.J) + N0(r.K), 1); return `<div class="brm" style="width:${w || 84}px" title="Bueno ${N0(r.I)} · Regular ${N0(r.J)} · Malo ${N0(r.K)}"><i class="b" style="width:${N0(r.I) / t * 100}%"></i><i class="r" style="width:${N0(r.J) / t * 100}%"></i><i class="m" style="width:${N0(r.K) / t * 100}%"></i></div>`; };
+const brmTxt = r => `<span class="brmn">B ${N0(r.I)} · R ${N0(r.J)} · M ${N0(r.K)}</span>`;
+const codTxt = r => !r.M ? '—' : r.M === r.N ? esc(r.M) : esc(r.M) + ' – ' + esc(String(r.N).slice(-4));
+const kChip = (x, r) => { const c = CK[x.k]; let t = `<span class="chip ${c[2]}">${c[0]} ${x.k === 'alerta' ? 'Revisar' : x.k === 'reet' ? 'Re-etiquetar' : x.k === 'cons' ? 'Conserva' : x.k === 'rec' ? 'Recicla' : 'Nuevo'}</span>`;
+  if (x.k === 'rec' && x.nw) t += ` <span class="chip new" title="${x.nw} con código nuevo">+${x.nw} ✚</span>`;
+  if (x.k === 'reet') t += ` <span class="hint">${x.rc ? '↺' : '✚'}</span>`;
+  return t; };
 MODS.conteo = {
+  base() { const s = UI.conteo; return R.logical.filter(r => !s.u || norm(r.C) === norm(s.u)); },
   list() {
-    const s = UI.conteo, q = norm(s.q);
-    return R.logical.filter(r => (!s.u || norm(r.C) === norm(s.u)) && (!q || [r.E, r.F, r.G, r.P, r.Q, r.U, r.M, r.N].some(x => norm(x).includes(q)))
-      && (!s.f || (s.f === 'alerta' ? r.V && r.V.charAt(0) !== 'ℹ' : s.f === 'sin' ? !r.M : s.f === 'cons' ? r.AJ >= 0 && r.AF > 0 : s.f === 'reet' ? r.AR : true)));
+    const s = UI.conteo, q = norm(s.q), K = cKinds();
+    const f = s.f === 'sin' ? 'alerta' : s.f;
+    return this.base().filter(r => (!q || [r.E, r.F, r.G, r.P, r.Q, r.U, r.M, r.N, r.C].some(x => norm(x).includes(q))) && (!f || K.get(r).k === f));
   },
   html() {
-    const s = UI.conteo, L = this.list(), sel = s.sel != null ? R.logical.find(r => r.ROW === s.sel) : null;
-    const loc = s.u ? X.loc[norm(s.u)] : null;
-    return `<div class="card"><div class="row">
-      <div class="field"><span class="lbl">Ubicación</span><select data-ch="cU">${ubicOpts(s.u)}</select></div>
-      <div class="field"><span class="lbl">Mostrar</span><select data-ch="cF">${[['', 'Todos'], ['alerta', 'Con alerta'], ['sin', 'Sin código'], ['cons', 'Conservan su código'], ['reet', 'Reetiquetar (otra familia)']].map(([v, t]) => `<option value="${v}"${s.f === v ? ' selected' : ''}>${t}</option>`).join('')}</select></div>
-      <div class="field" style="flex:1;min-width:200px"><span class="lbl">Buscar</span><input type="search" data-in="cQ" value="${esc(s.q)}" placeholder="Bien, etiqueta, serie, código…"></div>
-      <div class="hint" style="align-self:flex-end">${L.length} registros · ${fmtN(sumL(L))} bienes${loc ? ' · ' + estChip(loc) : ''}</div></div></div>
-    <div class="grid g-main"><div id="cTable">${this.table(L)}</div><div class="card det" id="cDet">${sel ? this.detail(sel) : '<div class="hint">Toque un registro para ver por qué recibe esos códigos.</div>'}</div></div>`;
+    const s = UI.conteo, K = cKinds(), B = this.base(), L = this.list(), sel = s.sel != null ? R.logical.find(r => r.ROW === s.sel) : null;
+    const loc = s.u ? X.loc[norm(s.u)] : null, v = cVista();
+    const cnt = { cons: [0, 0], rec: [0, 0], nw: [0, 0], reet: [0, 0], alerta: [0, 0] }; let bienes = 0, co = 0, cr = 0, cn = 0;
+    B.forEach(r => { const x = K.get(r); cnt[x.k][0]++; cnt[x.k][1] += x.L; bienes += x.L; co += x.o; cr += x.rc; cn += x.nw; });
+    const kp = (k, big, lbl, sub) => `<button type="button" class="ckp${k ? ' k-' + k : ''}${(s.f || '') === k ? ' on' : ''}" data-act="cK" data-k="${k}"><b>${fmtN(big)}</b><span>${lbl}</span><small>${sub}</small></button>`;
+    return `<div class="lstrip" id="cLocs">${this.locs()}</div>
+    <div class="card cbar"><div class="row">
+      <div class="ctit"><b>${s.u ? esc(s.u) : 'Todas las ubicaciones'}</b>${loc ? (loc.t ? ` <span class="hint">· ${esc(loc.t)}</span>` : '') + ' ' + estChip(loc) : ''}</div>
+      <span class="hint">${fmtN(B.length)} registros · ${fmtN(bienes)} bienes</span><span style="flex:1"></span>
+      <input type="search" data-in="cQ" value="${esc(s.q)}" placeholder="🔎 Bien, etiqueta, serie, código…" style="min-width:240px;flex:0 1 320px">
+      <div class="seg"><button type="button" data-act="cV" data-v="tabla" class="${v === 'tabla' ? 'on' : ''}">☰ Tabla</button><button type="button" data-act="cV" data-v="tablero" class="${v === 'tablero' ? 'on' : ''}">▦ Tablero</button></div></div>
+      <div class="ckps">${kp('', bienes, 'Todos', fmtN(B.length) + ' registros')}${kp('cons', co, '🔒 Conservan', cnt.cons[0] + ' registros')}${kp('rec', cr, '↺ Reciclan', cnt.rec[0] + ' registros')}${kp('nw', cn, '✚ Nuevos', cnt.nw[0] + ' registros')}${kp('reet', cnt.reet[1], '⇄ Re-etiquetar', cnt.reet[0] + ' registros')}${kp('alerta', cnt.alerta[0], '⚠ Revisar', 'registros')}</div></div>
+    <div class="grid g-main"><div id="cTable">${v === 'tablero' ? this.board(L) : this.table(L)}</div><div class="card det" id="cDet">${sel ? this.detail(sel) : '<div class="hint">Toque un registro para ver por qué recibe esos códigos.</div>'}</div></div>`;
+  },
+  locs() {
+    const s = UI.conteo, K = cKinds();
+    const pill = (n, t, rows, l) => { const al = rows.filter(r => K.get(r).k === 'alerta').length, e = l ? X.estado(l) : 'fuera';
+      return `<button type="button" class="lpill e-${e}${norm(s.u) === norm(n) ? ' on' : ''}" data-act="cLoc" data-u="${esc(n)}" title="${esc(t || '')}"><b>${esc(n || 'Todas')}</b><small>${fmtN(sumL(rows))} bienes${al ? ` · <em>⚠ ${al}</em>` : ''}</small></button>`; };
+    const extra = R.logical.filter(r => r.C && !X.loc[norm(r.C)]).map(r => r.C).filter((v, i, a) => a.indexOf(v) === i);
+    return pill('', 'Todas las ubicaciones', R.logical, { cerrada: 0 })
+      + D.locs.map(l => pill(l.n, l.t, X.byU[norm(l.n)] || [], l)).join('')
+      + extra.map(n => pill(n, 'No está en la lista de ubicaciones', R.logical.filter(r => norm(r.C) === norm(n)), null)).join('');
   },
   table(L) {
-    const s = UI.conteo;
+    const s = UI.conteo, K = cKinds(), todas = !s.u;
     if (!L.length) return '<div class="card empty">Sin registros con ese filtro.</div>';
-    return `<div class="tw tall"><table class="t"><thead><tr><th class="n">#</th><th>Ubic.</th><th>Bien</th><th>Etiqueta</th><th class="n">B</th><th class="n">R</th><th class="n">M</th><th class="n">Total</th><th>Código desde – hasta</th><th>Alerta</th></tr></thead><tbody>
-      ${L.slice(0, s.lim).map(r => `<tr class="click${r.ROW === s.sel ? ' sel' : ''}" data-act="cSel" data-row="${r.ROW}"><td class="n">${r.A}</td><td>${esc(r.C)}</td><td>${esc(r.G)}</td><td class="code">${esc(r.E)}</td><td class="n">${r.I || ''}</td><td class="n">${r.J || ''}</td><td class="n">${r.K || ''}</td><td class="n"><b>${r.L}</b></td><td class="code">${rango(r)}</td><td>${alertHtml(r.V)}</td></tr>`).join('')}
+    return `<div class="tw tall"><table class="t ct"><thead><tr><th class="n">#</th>${todas ? '<th>Ubic.</th>' : ''}<th>Bien</th><th class="n">Cant.</th><th>Estado</th><th>Etiqueta → Código</th><th>Resultado</th></tr></thead><tbody>
+      ${L.slice(0, s.lim).map(r => { const x = K.get(r), g = X.reg[r.id] || {};
+        return `<tr class="click${r.ROW === s.sel ? ' sel' : ''}" data-act="cSel" data-row="${r.ROW}"><td class="n hint">${r.A}</td>${todas ? `<td>${esc(r.C)}</td>` : ''}
+        <td><b>${esc(String(r.G).replace(/^🔒\s*/, '').replace(/^\d{4} - /, ''))}</b><div class="cblk">${esc(r.X || '¿bloque?')}${(g.fotos || []).length ? ' · 📷' : ''}${r.Q ? ' · 📝' : ''}</div></td>
+        <td class="n"><b class="cq">${r.L}</b></td><td>${brmBar(r)}${brmTxt(r)}</td>
+        <td>${r.E ? `<span class="code">${esc(r.E)}</span>` : '<span class="hint">sin etiqueta</span>'}<div class="hint" style="white-space:nowrap">→ <span class="code cto">${codTxt(r)}</span></div></td>
+        <td>${kChip(x, r)}${r.V && x.k !== 'alerta' && r.V.charAt(0) === 'ℹ' ? ` <span title="${esc(r.V)}" class="hint">ℹ</span>` : ''}${r.V && r.V.charAt(0) !== 'ℹ' && !(x.k === 'reet') ? `<div class="calert${x.k === 'alerta' ? '' : ' wa'}">${esc(r.V)}</div>` : ''}</td></tr>`; }).join('')}
     </tbody></table>${L.length > s.lim ? `<div class="more"><button class="btn sm" data-act="cMore" type="button">Mostrar ${Math.min(300, L.length - s.lim)} más (de ${L.length})</button></div>` : ''}</div>`;
+  },
+  board(L) {
+    const s = UI.conteo, K = cKinds(), todas = !s.u, cols = { cons: [], rec: [], nw: [], alerta: [] };
+    L.forEach(r => { const x = K.get(r); (cols[x.k === 'reet' ? (x.rc ? 'rec' : 'nw') : x.k]).push(r); });
+    const lim = Math.max(60, s.lim / 2);
+    const it = r => { const x = K.get(r);
+      return `<div class="cit${r.ROW === s.sel ? ' sel' : ''}" data-act="cSel" data-row="${r.ROW}"><div class="h"><span class="hint">#${r.A}</span><b>${esc(String(r.G).replace(/^🔒\s*/, '').replace(/^\d{4} - /, ''))}</b><span class="q">×${r.L}</span></div>
+        <div class="code cto">${x.k === 'reet' ? '<span class="chip re">⇄</span> ' : ''}${r.E && x.k !== 'cons' ? esc(String(r.E).replace(/^\d+-/, '')) + ' → ' : ''}${codTxt(r)}</div>
+        <div class="row" style="gap:8px">${brmBar(r, 64)}${brmTxt(r)}${todas ? `<span class="hint" style="margin-left:auto">${esc(r.C)}</span>` : ''}</div>${r.V && r.V.charAt(0) !== 'ℹ' && x.k !== 'reet' ? `<div class="calert${x.k === 'alerta' ? '' : ' wa'}">${esc(r.V)}</div>` : x.k === 'rec' && x.nw ? `<div class="hint">${x.rc} reciclados · ${x.nw} nuevos</div>` : ''}</div>`; };
+    const col = (k, t) => { const a = cols[k], b = a.reduce((p, r) => p + K.get(r).L, 0);
+      return `<div class="ccol k-${k}"><h4>${t}<b>${fmtN(b)}</b></h4>${a.slice(0, lim).map(it).join('') || '<div class="hint" style="padding:6px">—</div>'}${a.length > lim ? `<button class="btn sm" data-act="cMore" type="button">+${a.length - lim} más</button>` : ''}</div>`; };
+    if (!L.length) return '<div class="card empty">Sin registros con ese filtro.</div>';
+    return `<div class="cboard">${col('cons', '🔒 Conservan su etiqueta')}${col('rec', '↺ Reciclan un código')}${col('nw', '✚ Códigos nuevos')}${col('alerta', '⚠ Revisar')}</div>`;
   },
   detail(r) {
     const g = X.reg[r.id] || {}, cs = R.cod.filter(c => c.row === r), n = r.W + '-' + r.X;
@@ -234,12 +291,15 @@ function explain(r, cs) {
   } else out.push(`Modo sin reciclar: se numera después del último correlativo del bloque (<span class="mono">${Motor.util.pad4(r.AC)}</span>).`);
   return out;
 }
-ACT.cSel = b => { UI.conteo.sel = +b.dataset.row; $$('#cTable tr.sel').forEach(t => t.classList.remove('sel')); b.classList.add('sel'); const r = R.logical.find(x => x.ROW === UI.conteo.sel); $('#cDet').innerHTML = MODS.conteo.detail(r); if (innerWidth < 1100) $('#cDet').scrollIntoView({ behavior: 'smooth' }); };
-ACT.cMore = () => { UI.conteo.lim += 300; $('#cTable').innerHTML = MODS.conteo.table(MODS.conteo.list()); };
+ACT.cSel = b => { UI.conteo.sel = +b.dataset.row; $$('#cTable .sel').forEach(t => t.classList.remove('sel')); b.classList.add('sel'); const r = R.logical.find(x => x.ROW === UI.conteo.sel); $('#cDet').innerHTML = MODS.conteo.detail(r); if (innerWidth < 1100) $('#cDet').scrollIntoView({ behavior: 'smooth' }); };
+ACT.cK = b => { UI.conteo.f = b.dataset.k; UI.conteo.lim = 300; render(); };
+ACT.cV = b => { UI.conteo.v = b.dataset.v; LS.set('cview', b.dataset.v); render(); };
+ACT.cLoc = b => { UI.conteo.u = b.dataset.u; UI.conteo.sel = null; UI.conteo.lim = 300; render(); };
+ACT.cMore = () => { UI.conteo.lim += 300; const L = MODS.conteo.list(); $('#cTable').innerHTML = cVista() === 'tablero' ? MODS.conteo.board(L) : MODS.conteo.table(L); };
 INP.cU = el => { UI.conteo.u = el.value; UI.conteo.sel = null; UI.conteo.lim = 300; render(); };
 INP.cF = el => { UI.conteo.f = el.value; UI.conteo.lim = 300; render(); };
-INP.cQ = debounce(el => { UI.conteo.q = el.value; UI.conteo.lim = 300; $('#cTable').innerHTML = MODS.conteo.table(MODS.conteo.list()); }, 220);
-MODS.conteo.after = () => { if (UI.conteo.sel != null) { const tr = $(`#cTable tr[data-row="${UI.conteo.sel}"]`); if (tr) tr.scrollIntoView({ block: 'center' }); } };
+INP.cQ = debounce(el => { UI.conteo.q = el.value; UI.conteo.lim = 300; const L = MODS.conteo.list(); $('#cTable').innerHTML = cVista() === 'tablero' ? MODS.conteo.board(L) : MODS.conteo.table(L); }, 220);
+MODS.conteo.after = () => { const p = $('#cLocs .lpill.on'); if (p) p.scrollIntoView({ block: 'nearest', inline: 'center' }); if (UI.conteo.sel != null) { const tr = $(`#cTable [data-row="${UI.conteo.sel}"]`); if (tr) tr.scrollIntoView({ block: 'center' }); } };
 
 /* ===================== CÓDIGOS ASIGNADOS ===================== */
 MODS.codigos = {

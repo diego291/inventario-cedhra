@@ -257,6 +257,34 @@ u.conteo{background:var(--ac)}u.cierre{background:var(--ok)}u.actas{background:v
 .catbar{position:sticky;bottom:12px;z-index:5;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--navy);color:#fff;border-radius:14px;padding:10px 14px;box-shadow:0 14px 40px rgba(20,33,61,.3);margin-top:12px}
 .catbar .cbtxt{font-size:12px;color:#C9D3E3;min-width:0}.catbar .cbsync{font-size:12.5px;color:#E9ECF2}
 .catbar .btn{background:rgba(255,255,255,.12);color:#fff;border-color:transparent}.catbar .btn.pri{background:var(--ac);color:var(--navy)}.catbar .btn:disabled{opacity:.45}
+/* Conteo v8.1 */
+.chip.re{background:#EDE4F7;color:#6A3FA0}
+.lstrip{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 8px;margin-bottom:10px;scrollbar-width:thin}
+.lpill{flex:none;display:flex;flex-direction:column;align-items:flex-start;gap:1px;border:1px solid var(--ln);background:var(--sf);border-radius:10px;padding:6px 11px 7px;cursor:pointer;font:inherit;color:var(--fg);text-align:left;border-bottom-width:3px;min-width:70px}
+.lpill b{font-size:13px;white-space:nowrap}.lpill small{font-size:11px;color:var(--mu);white-space:nowrap}.lpill em{font-style:normal;color:var(--bad);font-weight:700}
+.lpill.e-cerrada{border-bottom-color:var(--ok)}.lpill.e-revision{border-bottom-color:var(--in)}.lpill.e-proceso{border-bottom-color:var(--ac)}.lpill.e-pendiente{border-bottom-color:var(--ln)}.lpill.e-fuera{border-bottom-color:var(--bad)}
+.lpill:hover{background:#FBF6EA}.lpill.on{background:var(--navy);color:#fff;border-color:var(--navy)}.lpill.on small{color:#C9D3E3}.lpill.on em{color:#FFB3B3}
+.cbar{gap:12px}.ctit b{font-size:18px}
+.seg{display:inline-flex;border:1px solid var(--ln);border-radius:10px;overflow:hidden}.seg button{border:0;background:var(--sf);padding:7px 12px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;color:var(--mu)}.seg button.on{background:var(--navy);color:#fff}
+.ckps{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.ckp{border:1px solid var(--ln);background:var(--sf);border-radius:12px;padding:8px 11px;text-align:left;cursor:pointer;font:inherit;color:var(--fg);display:flex;flex-direction:column;gap:0}
+.ckp b{font-size:21px;line-height:1.15;font-variant-numeric:tabular-nums}.ckp span{font-size:12px;font-weight:600}.ckp small{font-size:11px;color:var(--mu)}
+.ckp.k-cons b{color:var(--ok)}.ckp.k-rec b{color:var(--in)}.ckp.k-nw b{color:#9A5410}.ckp.k-reet b{color:#6A3FA0}.ckp.k-alerta b{color:var(--bad)}
+.ckp:hover{background:#FBF6EA}.ckp.on{outline:2px solid var(--ac);background:#FFF6E8}
+@media (max-width:900px){.ckps{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.brm{display:flex;height:7px;border-radius:5px;overflow:hidden;background:var(--sf2)}.brm i{display:block}.brm .b{background:#2F7D4F}.brm .r{background:#B98516}.brm .m{background:#B23A3A}
+.brmn{display:block;font-size:10.5px;color:var(--mu);font-family:'IBM Plex Mono',monospace;margin-top:2px;white-space:nowrap}
+table.ct td{vertical-align:middle}.cblk{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mu)}.cq{font-size:15px}
+.cto{color:var(--fg);font-weight:600;white-space:nowrap}.calert.wa{color:var(--wa)}.calert{font-size:11.5px;color:var(--bad);margin-top:3px;max-width:260px;line-height:1.3}
+.cboard{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:start}
+.ccol{background:var(--sf2);border-radius:14px;padding:8px;display:flex;flex-direction:column;gap:7px;max-height:calc(100vh - 300px);overflow:auto}
+.ccol h4{margin:2px 4px 2px;font-size:13px;display:flex;gap:8px;align-items:center;position:sticky;top:-8px;background:var(--sf2);padding:4px 0;z-index:1}.ccol h4 b{margin-left:auto;font-variant-numeric:tabular-nums}
+.ccol.k-cons h4{color:var(--ok)}.ccol.k-rec h4{color:var(--in)}.ccol.k-nw h4{color:#9A5410}.ccol.k-alerta h4{color:var(--bad)}
+.cit{background:var(--sf);border:1px solid var(--ln);border-radius:10px;padding:7px 9px;font-size:12.5px;display:flex;flex-direction:column;gap:3px;cursor:pointer}
+.cit:hover{border-color:var(--ac)}.cit.sel{outline:2px solid var(--ac)}
+.cit .h{display:flex;gap:6px;align-items:baseline}.cit .h b{font-size:13px;min-width:0}.cit .h .q{margin-left:auto;font-weight:800;font-family:'IBM Plex Mono',monospace}
+.cit .code{font-size:11.5px}
+@media (max-width:1100px){.cboard{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
 <style id="pageStyle">@page{size:letter;margin:12mm}</style>
 </head>
