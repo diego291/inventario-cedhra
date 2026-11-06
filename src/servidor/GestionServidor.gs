@@ -11,7 +11,7 @@
  *   G_ETIQUETADO  → códigos ya etiquetados por ubicación (para avisar si algo cambia)
  */
 var GS = { CFG: 'G_CONFIG', REG: 'G_REGLAS', CAT: 'G_CATALOGO', RUB: 'G_RUBROS', EQ: 'G_EQUIVALENCIAS', INV: 'G_INVENTARIO', RESP: 'RESPONSABLES', ACT: 'ACTAS', TXT: 'G_TEXTOS', ETQ: 'G_ETIQUETADO',
-  PER: 'PERSONAS', TRA: 'TRASLADOS', NOT: 'G_NOTAS', PLA: 'G_PLANTILLAS', JUS: 'G_JUSTIFICACIONES' };
+  PER: 'PERSONAS', TRA: 'TRASLADOS', NOT: 'G_NOTAS', PLA: 'G_PLANTILLAS', JUS: 'G_JUSTIFICACIONES', EXT: 'G_CODIGOS_AGREGADOS' };
 var G_HEAD = {
   G_CONFIG: ['Clave', 'Valor', 'Qué es'],
   G_REGLAS: ['Tipo', 'Valor 1', 'Valor 2', 'Nota'],
@@ -26,6 +26,7 @@ var G_HEAD = {
   G_NOTAS: ['ID', 'Tipo', 'Texto', 'Fecha', 'Hora', 'Aviso (min)', 'Hecho', 'Fijada', 'Vínculo', 'Color', 'Compartida', 'Usuario ID', 'Usuario', 'Creado', 'Modificado'],
   G_PLANTILLAS: ['Nombre', 'Reporte', 'Configuración (no editar)', 'Creada por', 'Fecha'],
   G_JUSTIFICACIONES: ['Código', 'Justificación', 'Por', 'Fecha'],
+  G_CODIGOS_AGREGADOS: ['Código', 'Ubicación donde está', 'Fecha adquisición', 'Valor', 'Serie', 'Observación', 'Agregado por', 'Fecha de registro'],
   G_TEXTOS: ['Clave', 'Texto', 'Para qué sirve'],
   G_ETIQUETADO: ['Ubicación', 'Fecha', 'Por', 'Códigos (no editar)']
 };
@@ -74,7 +75,7 @@ function gSheet_(name) {
     }
     if (name === GS.TXT) sh.getRange(2, 1, G_TEXTOS_DEF.length, 3).setValues(G_TEXTOS_DEF);
     if (name === GS.INV) sh.getRange('A:H').setNumberFormat('@');
-    if ([GS.CAT, GS.RUB, GS.REG, GS.RESP, GS.EQ, GS.PER, GS.PLA].indexOf(name) >= 0) sh.getRange(1, 1, sh.getMaxRows(), head.length).setNumberFormat('@');
+    if ([GS.CAT, GS.RUB, GS.REG, GS.RESP, GS.EQ, GS.PER, GS.PLA, GS.EXT].indexOf(name) >= 0) sh.getRange(1, 1, sh.getMaxRows(), head.length).setNumberFormat('@');
   } else if (name === GS.RESP || name === GS.ACT) {   // hojas creadas por la versión 5: agrega la columna nueva
     var hd = G_HEAD[name], n = hd.length;
     if (sh.getMaxColumns() < n) sh.insertColumnsAfter(sh.getMaxColumns(), n - sh.getMaxColumns());
@@ -122,7 +123,10 @@ function gBase_() {
     return { code: str_(r[0]).trim(), inst: str_(r[1]).trim(), blk: blk_(r[2]), correl: Number(r[3]) || 0, desc: str_(r[4]), marca: str_(r[5]), modelo: str_(r[6]), serie: str_(r[7]),
       fecha: d10_(r[8]), valor: Number(r[9]) || 0, calidad: str_(r[10]), asig: str_(r[11]), manual: str_(r[12]).trim() };
   });
-  b = { cfg: cfg, consBlq: consBlq, rc: rc, cat: cat, rubros: rubros, eq: eq, inv: inv };
+  var extra = gRows_(GS.EXT).filter(function (r) { return str_(r[0]).trim(); }).map(function (r) {
+    return { code: str_(r[0]).trim().toUpperCase(), ubic: str_(r[1]).trim(), fecha: d10_(r[2]), valor: Number(r[3]) || 0, serie: str_(r[4]).trim(), obs: str_(r[5]), por: str_(r[6]), t: d10_(r[7]) };
+  });
+  b = { cfg: cfg, consBlq: consBlq, rc: rc, cat: cat, rubros: rubros, eq: eq, inv: inv, extra: extra };
   cachePutBig_(key, b);
   return b;
 }
@@ -827,5 +831,44 @@ function api_g_catSave(tok, ch, sync) {
     log_(u, 'Gestión: catálogo', '', log.join(' | ').slice(0, 1500) + (sync ? ' (app de conteo: ' + app + ')' : ''), u.dev);
     gBump_();
     return { ok: true, cambios: log.length, app: app, cat: cat.map(function (r) { return { c: r[0], manual: r[1], inst: r[2], usar: r[3], origen: r[4], descInv: r[5] }; }) };
+  });
+}
+
+/* ================= CÓDIGOS REGISTRADOS DESPUÉS DEL CORTE ================= */
+/**
+ * Códigos que sí existen en SIGES pero no venían en el inventario anterior impreso (se registraron después del corte).
+ * Se agregan al inventario como RESERVADOS: se conservan solo si su bien se cuenta con esa etiqueta en la ubicación indicada.
+ * list = [{code, ubic, fecha, valor, serie, obs}] reemplaza toda la lista (todo o nada).
+ */
+function api_g_extraSave(tok, list) {
+  var u = auth_(tok, 'Administrador');
+  list = Array.isArray(list) ? list : [];
+  return withLock_(function () {
+    var b = gBase_(), cfg = b.cfg || {}, insts = [str_(cfg.inst || '11674')].concat(cfg.otrasInst || []).map(function (x) { return str_(x).trim(); }).filter(String);
+    var cat = {}; (b.cat || []).forEach(function (c) { if (c.c) cat[c.c] = c; });
+    var inv = {}; (b.inv || []).forEach(function (o) { inv[o.code.toUpperCase()] = 1; });
+    var locs = {}; locsOut_().forEach(function (l) { locs[norm_(l.n)] = l.n; });
+    var prev = {}; gRows_(GS.EXT).forEach(function (r) { var c = str_(r[0]).trim().toUpperCase(); if (c) prev[c] = r; });
+    var seen = {}, errs = [], out = [], hoy = fmt_(new Date()).slice(0, 10);
+    list.forEach(function (x, i) {
+      var c = str_(x.code).trim().toUpperCase().replace(/\s+/g, ''), n = 'Fila ' + (i + 1) + (c ? ' (' + c + ')' : '');
+      if (!/^\d{5}-\d{4}-\d{4}$/.test(c)) { errs.push(n + ': el código debe ser como 11674-1103-0016'); return; }
+      if (insts.indexOf(c.slice(0, 5)) < 0) errs.push(n + ': la institución ' + c.slice(0, 5) + ' no está en Configuración › General');
+      if (!cat[c.slice(6, 10)]) errs.push(n + ': el bloque ' + c.slice(6, 10) + ' no está en el catálogo');
+      if (inv[c]) errs.push(n + ': ya está en el inventario anterior (no hace falta agregarlo)');
+      if (seen[c]) errs.push(n + ': está repetido en la lista');
+      seen[c] = 1;
+      var ub = locs[norm_(x.ubic)];
+      if (!ub) errs.push(n + ': elija la ubicación donde está el bien');
+      var f = str_(x.fecha).trim(); if (f && !/^\d{4}-\d\d-\d\d$/.test(f)) errs.push(n + ': fecha no válida');
+      var v = x.valor === '' || x.valor == null ? '' : Number(x.valor); if (v !== '' && (!isFinite(v) || v < 0)) errs.push(n + ': valor no válido');
+      var p = prev[c];
+      out.push([c, ub || '', f, v, str_(x.serie).trim(), str_(x.obs).trim(), p ? str_(p[6]) : u.nombre, p ? str_(p[7]) : hoy]);
+    });
+    if (errs.length) throw valErr_('No se guardó nada. Revise: ' + errs.slice(0, 8).join(' · ') + (errs.length > 8 ? ' (+' + (errs.length - 8) + ')' : ''));
+    gWrite_(GS.EXT, out, ['@', '@', '@', '0.00', '@', '@', '@', '@']);
+    log_(u, 'Gestión: códigos agregados', '', out.map(function (r) { return r[0] + ' @ ' + r[1]; }).join(' | ').slice(0, 1500), u.dev);
+    gBump_();
+    return { ok: true, n: out.length, extra: out.map(function (r) { return { code: r[0], ubic: r[1], fecha: r[2], valor: Number(r[3]) || 0, serie: r[4], obs: r[5], por: r[6], t: r[7] }; }) };
   });
 }

@@ -1,7 +1,7 @@
 /* ===================== CONFIGURACIÓN ===================== */
 const CFG_TABS = { importar: 'Importar del Excel v10', general: 'General', reglas: 'Reglas de códigos', familia: 'Corrección de familia', eq: 'Equivalencias', textos: 'Textos del acta', sistema: 'Sistema' };
 let SYS = null;
-let IMP = null, EQED = null, RCED = null;
+let IMP = null, EQED = null, RCED = null, EXF = { code: '', ubic: '', fecha: '', valor: '', serie: '', obs: '' };
 MODS.config = {
   html() {
     const k = UI.cfg, ro = !isAdmin();
@@ -72,7 +72,25 @@ MODS.config = {
       <div class="card cfgsec"><h2>Bloques a conservar completos</h2><p class="hint" style="margin:0">Uno por línea: <span class="mono">5404</span> (el bloque en todas las instituciones) o <span class="mono">11674-1133</span> (solo esa institución).</p>
       <textarea id="consBlqTxt" rows="8" class="mono">${esc((BASE.consBlq || []).join('\n'))}</textarea>
       <div><button class="btn pri" data-act="reglasSave" data-which="cons" type="button">Guardar bloques</button></div></div></div>
+      ${this.extra()}
       <div class="banner wa">Cambiar estas reglas cambia los códigos asignados. Hágalo antes de etiquetar; si ya hay ubicaciones etiquetadas, el sistema avisará qué códigos cambiaron.</div>`;
+  },
+  extra() {
+    const L = BASE.extra || [], f = EXF, ro = !isAdmin();
+    const chk = extraCheck(f.code), locs = D.locs.map(l => `<option value="${esc(l.n)}"${norm(f.ubic) === norm(l.n) ? ' selected' : ''}>${esc(l.n)}${l.t ? ' · ' + esc(l.t) : ''}</option>`).join('');
+    return `<div class="card cfgsec" style="margin-top:16px"><h2>Códigos registrados después del corte <span class="meta">${L.length} agregado(s)</span></h2>
+      <p class="hint" style="margin:0">Códigos que <b>sí están en SIGES</b> pero no venían en el inventario anterior porque se registraron después de la fecha en que se imprimió. Se <b>conservan</b> solo si cumplen las reglas (institución, bloque del catálogo) y el bien se cuenta <b>con esa etiqueta en la ubicación indicada</b>. Mientras no aparezca, el código queda reservado (nadie más lo recibe).</p>
+      ${ro ? '' : `<div class="exform">
+        <div class="field"><span class="lbl">Código</span><input type="text" class="mono" data-in="exCode" value="${esc(f.code)}" placeholder="11674-1103-0016" maxlength="15" autocomplete="off"><span class="hint" id="exChk">${chk.html}</span></div>
+        <div class="field"><span class="lbl">Ubicación donde está</span><select data-ch="exUbic"><option value="">— elegir —</option>${locs}</select></div>
+        <div class="field"><span class="lbl">Fecha de adquisición</span><input type="date" data-ch="exFecha" value="${esc(f.fecha)}"></div>
+        <div class="field"><span class="lbl">Valor ($)</span><input type="number" step="0.01" min="0" data-ch="exValor" value="${esc(f.valor)}" placeholder="0.00"></div>
+        <div class="field"><span class="lbl">Serie (opcional)</span><input type="text" data-ch="exSerie" value="${esc(f.serie)}"></div>
+        <div class="field" style="grid-column:span 2"><span class="lbl">Observación (opcional)</span><input type="text" data-ch="exObs" value="${esc(f.obs)}" placeholder="Ej.: registrado en SIGES el 20/10/2026"></div>
+        <div class="field" style="align-self:end"><button class="btn pri" data-act="exAdd" type="button">+ Agregar código</button></div></div>`}
+      ${L.length ? `<div class="tw"><table class="t"><thead><tr><th>Código</th><th>Bien</th><th>Ubicación donde está</th><th>Adquisición</th><th class="n">Valor</th><th>Qué pasa en el conteo</th><th></th></tr></thead><tbody>
+        ${L.map((x, i) => { const e = extraEstado(x); return `<tr><td class="code">${esc(x.code)}</td><td>${esc(R.catDesc(x.code.slice(6, 10)) || x.code.slice(6, 10))}${x.serie ? `<div class="hint">S/N ${esc(x.serie)}</div>` : ''}${x.obs ? `<div class="hint">${esc(x.obs)}</div>` : ''}</td><td>${esc(x.ubic)}</td><td>${x.fecha ? esc(dmy(x.fecha)) : '<span class="hint">—</span>'}</td><td class="n">${x.valor ? money(x.valor) : ''}</td><td>${e}</td>
+          <td>${ro ? '' : `<button class="btn sm ghost" data-act="exDel" data-i="${i}" type="button" title="Quitar de la lista">🗑</button>`}</td></tr>`; }).join('')}</tbody></table></div>` : '<div class="hint">Todavía no hay códigos agregados.</div>'}</div>`;
   },
   familia() {
     if (!RCED) RCED = (BASE.rc || []).map(p => [p[0], p[1], '']);
@@ -217,3 +235,42 @@ ACT.sysUpd = async b => {
   try { const antes = SYS && SYS.version; SYS = await api('api_sys_actualizar'); render(); toast(SYS.version !== antes ? 'Versión nueva instalada: ' + SYS.version + '. Recargue la página para ver los cambios.' : 'Ya tiene la versión más reciente (' + SYS.version + ').'); }
   catch (e) { toast(errMsg(e), true); b.disabled = false; }
 };
+
+/* ---- códigos registrados después del corte ---- */
+function extraCheck(code) {
+  const c = String(code || '').trim().toUpperCase();
+  if (!c) return { ok: false, html: 'Formato: institución-bloque-correlativo' };
+  if (!/^\d{5}-\d{4}-\d{4}$/.test(c)) return { ok: false, html: '<span style="color:var(--bad)">Debe ser como 11674-1103-0016</span>' };
+  const cfg = BASE.cfg || {}, insts = [String(cfg.inst || '11674')].concat(cfg.otrasInst || []);
+  if (!insts.includes(c.slice(0, 5))) return { ok: false, html: `<span style="color:var(--bad)">La institución ${c.slice(0, 5)} no está en Configuración › General</span>` };
+  const d = R.catDesc(c.slice(6, 10)); if (!d) return { ok: false, html: `<span style="color:var(--bad)">El bloque ${c.slice(6, 10)} no está en el catálogo</span>` };
+  if ((BASE.inv || []).some(o => o.code.toUpperCase() === c)) return { ok: false, html: '<span style="color:var(--wa)">Ya está en el inventario anterior: no hace falta agregarlo</span>' };
+  if ((BASE.extra || []).some(o => o.code === c)) return { ok: false, html: '<span style="color:var(--wa)">Ya está en esta lista</span>' };
+  const rc = (BASE.rc || []).find(p => p[0] === c.slice(6, 10));
+  return { ok: true, html: `<span style="color:var(--ok)">✓ ${esc(d)}</span>${rc ? ` <span style="color:var(--wa)">· ojo: el bloque ${rc[0]} está en corrección de familia → ${rc[1]}</span>` : ''}` };
+}
+function extraEstado(x) {
+  const r = R.logical.find(y => y.AO >= 0 && R.inv[y.AO] && String(R.inv[y.AO].code).toUpperCase() === x.code);
+  if (!r) return '<span class="chip">⏳ Aún no se cuenta con esa etiqueta</span>';
+  if (r.locMis) return `<span class="chip bad">⚠ Contado en ${esc(r.C)}</span> <a href="#" data-act="go" data-m="conteo" data-u="${esc(r.C)}" data-row="${r.ROW}">ver</a>`;
+  if (r.AR) return `<span class="chip re">⇄ Puesto en un bien de otra familia</span>`;
+  if (r.AF > 0) return `<span class="chip ok">🔒 Se conserva · ${esc(r.C)}</span>`;
+  return `<span class="chip wa">${esc(r.V || 'Revisar')}</span>`;
+}
+async function extraGuardar(list, msg) {
+  const r = await api('api_g_extraSave', list.map(x => ({ code: x.code, ubic: x.ubic, fecha: x.fecha, valor: x.valor, serie: x.serie, obs: x.obs })));
+  BASE.extra = r.extra; LS.set('gbase', null); recompute(); render(); toast(msg);
+}
+INP.exCode = el => { EXF.code = el.value.toUpperCase(); const t = $('#exChk'); if (t) t.innerHTML = extraCheck(EXF.code).html; };
+INP.exUbic = el => { EXF.ubic = el.value; }; INP.exFecha = el => { EXF.fecha = el.value; }; INP.exValor = el => { EXF.valor = el.value; };
+INP.exSerie = el => { EXF.serie = el.value; }; INP.exObs = el => { EXF.obs = el.value; };
+ACT.exAdd = async b => {
+  const ck = extraCheck(EXF.code); if (!ck.ok) { toast(ck.html.replace(/<[^>]+>/g, ''), true); return; }
+  if (!EXF.ubic) { toast('Elija la ubicación donde está el bien', true); return; }
+  b.disabled = true;
+  try { const c = EXF.code.trim().toUpperCase(); await extraGuardar((BASE.extra || []).concat([Object.assign({}, EXF, { code: c })]), c + ' agregado: se conserva si se cuenta con su etiqueta en ' + EXF.ubic); EXF = { code: '', ubic: '', fecha: '', valor: '', serie: '', obs: '' }; render(); }
+  catch (e) { toast(errMsg(e), true); b.disabled = false; }
+};
+ACT.exDel = b => { const x = (BASE.extra || [])[+b.dataset.i]; if (!x) return;
+  confirmModal(`¿Quitar ${x.code} de la lista? Si el bien se contó con esa etiqueta, dejará de conservarse y recibirá otro código.`, 'Quitar', async () => {
+    try { await extraGuardar(BASE.extra.filter((y, i) => i !== +b.dataset.i), x.code + ' quitado de la lista'); } catch (e) { toast(errMsg(e), true); } }); };

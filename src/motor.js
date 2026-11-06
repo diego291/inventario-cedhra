@@ -60,7 +60,8 @@ var Motor = (function () {
     var inv = (input.inv || []).filter(function (r) { return S(r.code) !== ''; }).map(function (r) {
       var o = {
         code: S(r.code), inst: S(r.inst), blk: S(r.blk), correl: Nn(r.correl), desc: S(r.desc), marca: S(r.marca), modelo: S(r.modelo),
-        serie: S(r.serie), fecha: S(r.fecha).slice(0, 10), valor: Nn(r.valor), calidad: S(r.calidad), asig: S(r.asig), manual: S(r.manual)
+        serie: S(r.serie), fecha: S(r.fecha).slice(0, 10), valor: Nn(r.valor), calidad: S(r.calidad), asig: S(r.asig), manual: S(r.manual),
+        reqU: S(r.reqU), extra: !!r.extra   // (extensión de la app) código agregado después del corte: solo se conserva en su ubicación
       };
       if (o.inst === '') o.inst = o.code.slice(0, 5);
       if (o.blk === '') o.blk = o.code.slice(6, 10);
@@ -136,6 +137,7 @@ var Motor = (function () {
       r.AN = r.AO >= 0 ? inv[r.AO].blk : '';
       r.AR = r.AO >= 0 && r.AN !== '' && r.AQ !== '?' && U(r.AQ) !== U(r.AN);
       r.AJ = (r.AO < 0 || r.AR) ? -1 : r.AO;
+      if (r.AJ >= 0 && inv[r.AJ].reqU !== '' && U(trim(inv[r.AJ].reqU)) !== U(trim(r.C))) { r.locMis = inv[r.AJ].reqU; r.AJ = -1; }   // (extensión de la app)
       if (r.AJ < 0) r.AL = false;
       else {
         var last = r.AJ + Math.max(1, Nn(r.L)) - 1;
@@ -150,7 +152,8 @@ var Motor = (function () {
       else if (isCode(F)) r.W = F.slice(0, 5);
       else if (r.AM !== '') r.W = r.AM;
       else r.W = S(cfg.inst);
-      if (r.AR && Nn(r.L) !== 1) r.AF = 0;
+      if (r.locMis) r.AF = 0;
+      else if (r.AR && Nn(r.L) !== 1) r.AF = 0;
       else if (r.AJ >= 0) r.AF = r.AL ? Nn(r.L) : 0;
       else if (r.blank || Nn(r.L) === 0 || r.X === '?' || catByCode[U(r.X)] === undefined) r.AF = 0;
       else r.AF = Nn(r.L);
@@ -270,6 +273,7 @@ var Motor = (function () {
       if (o.R !== 'Sin asignar') o.V = '';
       else if (o.AF !== '') o.V = 'FAMILIA EQUIVOCADA: registrado como ' + o.blk + ', el bien es ' + o.AF + '. Se descarga este código' + (o.AI !== '' ? ' y el bien se carga como ' + o.AI + ' con su misma fecha y valor' : ' (bien no encontrado)');
       else if (o.AE > 0) o.V = 'Etiqueta MAL ASIGNADA: se encontró puesta en un bien de otra familia (ver REPORTE_ETIQUETAS)';
+      else if (o.extra) o.V = 'Código AGREGADO después del corte que no se registró con su etiqueta en ' + o.reqU;
       else if (o.Y === 'Sí') o.V = 'Código RESERVADO (bien reciente o con serie) que no se registró por su código o serie en el conteo';
       else o.V = 'Bloque ' + o.blk + ': en sistema había ' + o.W + ', se contaron ' + afSum(o.inst, o.blk) + ' → sobran ' + (sinCount[U(o.N)] || 0) + ' (se descargan los más antiguos)';
     });
@@ -311,6 +315,7 @@ var Motor = (function () {
       if (r.E !== '' && r.AO < 0) {
         r.V = (serCand(AP) && (serieCount[U(AP)] || 0) > 1) ? 'Serie repetida en el inventario: escriba el código de la etiqueta' : 'La etiqueta no existe en el inventario anterior: se contó como bien sin etiqueta'; return;
       }
+      if (r.locMis) { r.V = 'Código agregado: está registrado en ' + r.locMis + ', pero se contó en otra ubicación (' + r.C + '). Revise la ubicación'; return; }
       if (r.AR) { r.V = L !== 1 ? 'Etiqueta de otra familia: la cantidad debe ser 1' : ((cntAOAR[r.AO] || 0) > 1 ? 'Esa etiqueta ya está registrada en otra fila' : ''); return; }
       if (isCode(F) && r.AO < 0) { r.V = 'El código no existe en el inventario anterior: se contó como bloque'; return; }
       if (r.AJ >= 0) {
@@ -489,7 +494,11 @@ var Motor = (function () {
       };
     });
     var ubic = lista.map(function (l) { return { n: trim(l.n), tipo: S(l.t), edif: S(l.z), resp: S(l.r), activa: (l.a === false || l.a === 'No') ? 'No' : 'Sí' }; });
-    return { cfg: base.cfg || {}, ubic: ubic, consBlq: base.consBlq || [], rc: base.rc || [], cat: base.cat || [], rubros: base.rubros || [], eq: base.eq || [], inv: base.inv || [], conteo: conteo };
+    return { cfg: base.cfg || {}, ubic: ubic, consBlq: base.consBlq || [], rc: base.rc || [], cat: base.cat || [], rubros: base.rubros || [], eq: base.eq || [], inv: (base.inv || []).concat((base.extra || []).map(function (x) {
+      var c = S(x.code).toUpperCase();
+      return { code: c, inst: c.slice(0, 5), blk: c.slice(6, 10), correl: Nn(c.slice(11)), desc: catD[c.slice(6, 10)] || '', marca: '', modelo: '', serie: S(x.serie),
+        fecha: S(x.fecha).slice(0, 10), valor: Nn(x.valor), calidad: '', asig: S(x.ubic), manual: 'Sí', reqU: S(x.ubic), extra: true };
+    })), conteo: conteo };
   }
 
   return { compute: compute, fromApp: fromApp, util: { isCode: isCode, pad4: pad4, fmtDMY: fmtDMY, money: money, trim: trim } };

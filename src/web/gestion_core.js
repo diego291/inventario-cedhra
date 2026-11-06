@@ -170,7 +170,7 @@ const ubicOpts = (sel, todas = 'Todas las ubicaciones') => `<option value="">${t
   + R.logical.filter(r => r.C && !X.loc[norm(r.C)]).map(r => r.C).filter((v, i, a) => a.indexOf(v) === i).map(n => `<option value="${esc(n)}"${norm(sel) === norm(n) ? ' selected' : ''}>${esc(n)} (no está en la lista)</option>`).join('');
 const estChip = l => { if (!l) return '<span class="chip bad">No está en la lista</span>'; const e = X.estado(l); return e === 'cerrada' ? '<span class="chip ok">✓ Cerrada</span>' : e === 'revision' ? '<span class="chip in">🔔 En revisión</span>' : e === 'proceso' ? '<span class="chip wa">En proceso</span>' : '<span class="chip">Pendiente</span>'; };
 const origenChip = o => o === 'Conservado' ? '<span class="chip ok">🔒 Conservado</span>' : o === 'Reciclado' ? '<span class="chip in">↺ Reciclado</span>' : '<span class="chip new">✚ Nuevo</span>';
-const ALERT_BAD = /no existe|Serie repetida|Esa etiqueta ya|otra familia|no se reconoce|Falta|cantidad debe|otro bloque|ya registrad/i;
+const ALERT_BAD = /otra ubicación|no existe|Serie repetida|Esa etiqueta ya|otra familia|no se reconoce|Falta|cantidad debe|otro bloque|ya registrad/i;
 const alertHtml = v => !v ? '' : `<span class="alert${/^ℹ/.test(v) ? ' info' : ALERT_BAD.test(v) ? ' bad' : ''}">${esc(v)}</span>`;
 const sumL = rows => rows.reduce((a, r) => a + N0(r.L), 0);
 
