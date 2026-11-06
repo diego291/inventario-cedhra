@@ -331,6 +331,22 @@ table.ct td{padding:13px 14px}table.ct th{padding:11px 14px}
 .upaso.ok{background:var(--okb);color:var(--ok)}.upaso.sig{background:#FCE7CF;color:#9A5410}
 .uatn{display:flex;gap:12px;flex-wrap:wrap;justify-content:space-between;align-items:center;background:#FFF2E0;border:1.5px dashed #E8B472;border-radius:12px;padding:12px 14px}
 .uatn>div{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.uatn b{color:#9A5410}
+/* Menú lateral que se oculta (v8.6) */
+.side .brand{display:flex;align-items:flex-start;gap:8px}.side .brand .bt{flex:1;min-width:0}
+.navtog{flex:none;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:#E9ECF2;border-radius:8px;width:28px;height:28px;font-size:16px;line-height:1;cursor:pointer}
+.navtog:hover{background:rgba(255,255,255,.14)}
+.side nav .ic{font-style:normal;width:20px;text-align:center;flex:none;font-size:15px}
+#app{transition:grid-template-columns .18s ease}
+body.navmin #app{grid-template-columns:64px 1fr}
+body.navmin .side .brand{flex-direction:column;align-items:center;padding:14px 8px}body.navmin .side .brand .bt{display:none}
+body.navmin .side .grp{font-size:0;padding:8px 0 2px;margin:0 14px;border-top:1px solid rgba(255,255,255,.08)}
+body.navmin .side nav button{justify-content:center;padding:10px 0;position:relative}
+body.navmin .side nav button .tx{display:none}
+body.navmin .side nav .n{position:absolute;top:3px;right:6px;font-size:9.5px;padding:0 4px;min-width:14px;text-align:center}
+body.navmin .side nav button[data-m="buscador"] .n{display:none}
+body.navmin .side .foot{padding:10px 6px;align-items:center;text-align:center}body.navmin .side .foot>div{display:none}
+body.navmin .side .foot a,body.navmin .side .foot button{font-size:0}body.navmin .side .foot a::before{content:'📱';font-size:16px}body.navmin .side .foot button::before{content:'⎋';font-size:16px;text-decoration:none}
+@media (max-width:900px){.navtog{display:none}}
 </style>
 <style id="pageStyle">@page{size:letter;margin:12mm}</style>
 </head>
@@ -350,23 +366,23 @@ table.ct td{padding:13px 14px}table.ct th{padding:11px 14px}
 
 <div id="app" hidden>
   <aside class="side">
-    <div class="brand"><small id="brandPer">Conteo físico</small><b>Gestión de Inventario</b></div>
+    <div class="brand"><div class="bt"><small id="brandPer">Conteo físico</small><b>Gestión de Inventario</b></div><button type="button" id="navTog" class="navtog" title="Ocultar menú (Ctrl+\\)" aria-label="Ocultar o mostrar el menú">«</button></div>
     <nav id="nav">
       <div class="grp">General</div>
-      <button data-m="inicio">Inicio</button>
-      <button data-m="buscador">Buscador <span class="n" style="background:rgba(255,255,255,.12);color:#C9D3E3">Ctrl K</span></button>
+      <button data-m="inicio" title="Inicio"><i class="ic">🏠</i><span class="tx">Inicio</span></button>
+      <button data-m="buscador" title="Buscador"><i class="ic">🔎</i><span class="tx">Buscador</span><span class="n" style="background:rgba(255,255,255,.12);color:#C9D3E3">Ctrl K</span></button>
       <div class="grp">Conteo</div>
-      <button data-m="conteo">Conteo <span class="n" id="nConteo"></span></button>
-      <button data-m="codigos">Códigos asignados <span class="n" id="nCod"></span></button>
-      <button data-m="conservar">Conservar códigos</button>
+      <button data-m="conteo" title="Conteo"><i class="ic">📋</i><span class="tx">Conteo</span><span class="n" id="nConteo"></span></button>
+      <button data-m="codigos" title="Códigos asignados"><i class="ic">🏷</i><span class="tx">Códigos asignados</span><span class="n" id="nCod"></span></button>
+      <button data-m="conservar" title="Conservar códigos"><i class="ic">🔒</i><span class="tx">Conservar códigos</span></button>
       <div class="grp">Documentos</div>
-      <button data-m="ubic">Ubicaciones y actas</button>
-      <button data-m="reportes">Reportes</button>
+      <button data-m="ubic" title="Ubicaciones y actas"><i class="ic">📍</i><span class="tx">Ubicaciones y actas</span></button>
+      <button data-m="reportes" title="Reportes"><i class="ic">📊</i><span class="tx">Reportes</span></button>
       <div class="grp">Datos</div>
-      <button data-m="personas">Personas</button>
-      <button data-m="catalogo">Catálogo</button>
-      <button data-m="inventario">Inventario anterior</button>
-      <button data-m="config">Configuración</button>
+      <button data-m="personas" title="Personas"><i class="ic">👥</i><span class="tx">Personas</span></button>
+      <button data-m="catalogo" title="Catálogo"><i class="ic">📚</i><span class="tx">Catálogo</span></button>
+      <button data-m="inventario" title="Inventario anterior"><i class="ic">🗂</i><span class="tx">Inventario anterior</span></button>
+      <button data-m="config" title="Configuración"><i class="ic">⚙</i><span class="tx">Configuración</span></button>
     </nav>
     <div class="foot">
       <div><b id="meName"></b><br><span id="meRol"></span></div>

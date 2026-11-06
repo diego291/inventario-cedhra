@@ -138,6 +138,10 @@ const TITLES = { inicio: ['Panel principal', 'Agenda, calendario y lo que requie
   actas: ['Fichas y actas', 'Ficha consolidada + acta de entrega y resguardo, por ubicación'], reportes: ['Reportes', 'Cargos, descargos, etiquetas, reclasificación y consolidado'],
   catalogo: ['Catálogo', 'Bloques del catálogo con lo contado y lo que había'], inventario: ['Inventario anterior', 'Qué pasa con cada código del sistema'], config: ['Configuración', 'Datos base, reglas de códigos, responsables y textos del acta'] };
 function go(m) { if (m === 'buscador') { openSearch(); return; } if (m === 'tablero' || m === 'actas') m = m === 'actas' ? 'ubic' : 'inicio'; MOD = MODS[m] ? m : 'inicio'; closeFicha(); LS.set('gmod', MOD); render(); window.scrollTo({ top: 0 }); }
+function navMin(on) { document.body.classList.toggle('navmin', on); const t = $('#navTog'); if (t) { t.textContent = on ? '»' : '«'; t.title = on ? 'Mostrar menú (Ctrl+\\)' : 'Ocultar menú (Ctrl+\\)'; } LS.set('navmin', on ? 1 : 0); }
+navMin(!!LS.get('navmin', 0));
+$('#navTog').onclick = () => navMin(!document.body.classList.contains('navmin'));
+document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === '\\') { e.preventDefault(); navMin(!document.body.classList.contains('navmin')); } });
 $('#nav').addEventListener('click', e => { const b = e.target.closest('button[data-m]'); if (b) go(b.dataset.m); });
 function header(extra) {
   const [t, s] = TITLES[MOD];
