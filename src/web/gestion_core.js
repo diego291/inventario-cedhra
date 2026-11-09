@@ -42,7 +42,7 @@ let TOKEN = LS.get('tok', ''), ME = null, D = null, BASE = null, R = null, X = n
 const DEV = (() => { let d = LS.get('dev', ''); if (!/^[A-Za-z0-9]{20,}$/.test(d)) { const a = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'; d = ''; const r = new Uint8Array(24); crypto.getRandomValues(r); r.forEach(x => d += a[x % a.length]); LS.set('dev', d); } return d; })();
 const isAdmin = () => ME && ME.lvl >= 3;
 const UI = { conteo: { u: '', f: '', q: '', sel: null, lim: 300 }, codigos: { u: '', o: '', q: '', lim: 400 }, conservar: { f: 'pend', q: '' }, inv: { r: '', y: '', q: '', u: '', lim: 300 },
-  cat: { q: '', solo: false }, rep: 'cargos', cfg: 'importar', bus: '', ubic: { sel: '', q: '', f: '', tab: 'res' }, per: { q: '', f: 'act' }, actas: { sel: {}, solo: true, oO: { ficha: true, acta: true, lista: false, copias: 1 }, oR: { ficha: true, acta: true, lista: false }, otros: [], det: 'bloque', firmas: 3, papel: 'Carta', portada: true, preview: false } };
+  cat: { q: '', solo: false }, rep: 'cargos', cfg: 'importar', bus: '', ubic: { sel: '', q: '', f: '', tab: 'res', vista: LS.get('uvista', 'tabla'), ts: {}, tq: '', tp: '', tg: LS.get('utg', 'g'), ti: false }, per: { q: '', f: 'act' }, actas: { sel: {}, solo: true, oO: { ficha: true, acta: true, lista: false, copias: 1 }, oR: { ficha: true, acta: true, lista: false }, otros: [], det: 'bloque', firmas: 3, papel: 'Carta', portada: true, preview: false } };
 
 function setSync(st, txt) { const s = $('#sync'); if (!s) return; s.className = 'sync' + (st === 'busy' ? ' busy' : st === 'err' ? ' err' : ''); s.textContent = txt; }
 

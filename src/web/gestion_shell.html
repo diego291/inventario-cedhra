@@ -416,6 +416,26 @@ body.dark .toast{box-shadow:0 10px 30px rgba(0,0,0,.5)}
 #calCard .cd{padding:5px 0 9px}
 @media (max-width:1250px){.ihero{grid-template-columns:auto minmax(0,1fr)}.inext{grid-column:1/-1}.isteps{grid-template-columns:repeat(3,minmax(0,1fr))}.ist:nth-child(3){border-right:0}.ist:nth-child(-n+3){border-bottom:1px solid var(--ln)}.igrid2{grid-template-columns:1fr 1fr}#calCard{grid-column:1/-1}.icol{height:auto;max-height:520px}}
 @media (max-width:760px){.ihero,.igrid2{grid-template-columns:1fr}.isteps{grid-template-columns:1fr 1fr}.iclk .t{font-size:32px}}
+
+/* Ubicaciones · tabla de control (v9.1) */
+.useg button{padding:5px 11px;font-size:12.5px}
+.umas{position:relative}.umas>summary{list-style:none;cursor:pointer}.umas>summary::-webkit-details-marker{display:none}
+.umenu{position:absolute;right:0;top:calc(100% + 6px);z-index:25;background:var(--card);border:1px solid var(--ln);border-radius:12px;box-shadow:0 14px 34px rgba(20,33,61,.18);padding:6px;display:flex;flex-direction:column;gap:4px;min-width:220px}
+.umenu .btn{justify-content:flex-start;border-color:transparent;text-align:left}
+.ukpi{cursor:pointer}.ukpi:hover{border-color:var(--ac)}.ukpi.on{border-color:var(--ac);box-shadow:0 0 0 2px var(--acl)}
+.uselbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--navy);color:#fff;border-radius:12px;padding:9px 12px;margin-bottom:10px}
+.uselbar .o{color:#C9D3E3;font-size:13px}.uselbar .btn{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);color:#fff}
+.uselbar .btn.pri{background:var(--ac);border-color:var(--ac);color:var(--navy)}
+.utab{max-height:calc(100vh - 300px)}.utab .cc{text-align:center;width:60px}
+.utab td{vertical-align:middle}.utab input[type=checkbox]{width:16px;height:16px;accent-color:var(--ac);cursor:pointer}
+.utab .ugr td{background:var(--sf2);font-weight:700;font-size:12.5px;padding:7px 10px}.utab .ugr span{color:var(--mu);font-weight:600}
+.utab tr.usel td{background:var(--acb)}.utab tr.uoff td{opacity:.6}
+.utab .uname{font-weight:700;color:var(--fg);text-decoration:none}.utab .uname:hover{color:var(--ac);text-decoration:underline}
+.utab .mini{display:block;font-size:11.5px;color:var(--mu)}
+.utab button.chip{border:0;cursor:pointer;font-family:inherit}.utab button.chip:hover{filter:brightness(1.08);text-decoration:underline}
+.ust{display:inline-flex;width:24px;height:24px;border-radius:50%;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+.ust.ok{background:var(--okb);color:var(--ok)}.ust.p{background:var(--nwb);color:var(--nw)}.ust.no{border:1.5px dashed var(--ln);color:var(--mu)}
+@media (max-width:700px){.uselbar .btn{flex:1}.utab{max-height:none}}
 </style>
 <style id="pageStyle">@page{size:letter;margin:12mm}</style>
 </head>

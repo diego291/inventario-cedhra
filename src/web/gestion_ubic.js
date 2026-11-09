@@ -10,17 +10,71 @@ function ubicFiltro(l) {
 }
 function ordenLista() { return D.locs.filter(l => !l.nueva).concat(D.locs.filter(l => l.nueva)); }
 MODS.ubic = {
-  extra() { return `${isAdmin() ? '<button class="btn sm" data-act="uExp" type="button">⬇ Excel</button><button class="btn sm" data-act="uImpOpen" type="button">⬆ Cargar Excel</button><button class="btn sm" data-act="uOrder" type="button">⇅ Orden</button>' : ''}<button class="btn sm" data-act="uBatch" type="button">🖨 Imprimir varias</button><button class="btn sm pri" data-act="uNew" type="button">+ Nueva ubicación</button>`; },
-  html() {
+  extra() {
+    const v = UI.ubic.vista, adm = isAdmin();
+    return `<div class="seg useg"><button type="button" data-act="uVista" data-v="tabla" class="${v === 'tabla' ? 'on' : ''}">▦ Tabla de control</button><button type="button" data-act="uVista" data-v="det" class="${v === 'det' ? 'on' : ''}">☰ Por ubicación</button></div>
+      <button class="btn sm pri" data-act="uNew" type="button">+ Nueva ubicación</button>
+      <details class="umas"><summary class="btn sm">⋯ Más</summary><div class="umenu">${adm ? '<button class="btn sm" data-act="uExp" type="button">⬇ Descargar Excel</button><button class="btn sm" data-act="uImpOpen" type="button">⬆ Cargar Excel</button><button class="btn sm" data-act="uOrder" type="button">⇅ Orden de numeración</button>' : ''}<button class="btn sm" data-act="uBatch" type="button">🖨 Imprimir varias (lista)</button></div></details>`;
+  },
+  html() { return UI.ubic.vista === 'det' ? this.htmlDet() : this.tabla(); },
+  htmlDet() {
     const s = UI.ubic, q = norm(s.q), all = ordenLista();
     if (!s.sel || !X.loc[norm(s.sel)]) s.sel = (all.find(l => l.cerrada) || all[0] || {}).n || '';
     const L = all.filter(l => ubicFiltro(l) && (!q || norm(l.n).includes(q) || norm(l.t + ' ' + l.z).includes(q) || respOf(l.n).some(p => norm(p.n).includes(q))));
     const cnt = k => all.filter(l => { const o = UI.ubic.f; UI.ubic.f = k; const r = ubicFiltro(l); UI.ubic.f = o; return r; }).length;
     const chips = [['', 'Todas'], ['cerr', 'Cerradas'], ['sinr', 'Sin responsable'], ['sina', 'Sin acta'], ['inac', 'Inactivas']];
-    return `<div class="ugrid"><div class="card ulist"><input type="search" data-in="uQ" value="${esc(s.q)}" placeholder="🔎 Buscar ubicación o responsable…">
+    return `<div class="ugrid"><div class="card ulist"><button class="btn sm" data-act="uVista" data-v="tabla" type="button" style="align-self:flex-start">← Tabla de control</button><input type="search" data-in="uQ" value="${esc(s.q)}" placeholder="🔎 Buscar ubicación o responsable…">
       <div class="row" style="gap:6px">${chips.map(([k, t]) => `<button type="button" class="chip ${s.f === k ? 'in' : ''}" data-act="uF" data-k="${k}" style="border:0;cursor:pointer">${t} ${cnt(k)}</button>`).join('')}</div>
       <div id="uL">${this.list(L)}</div></div>
       <div class="card udet" id="uDet">${this.detail(s.sel)}</div></div>`;
+  },
+  /* ---------- Tabla de control (vista C): una fila por ubicación, una columna por paso, acciones en lote ---------- */
+  tabla() {
+    const s = UI.ubic, A = X.act, P = A.map(pasosDe);
+    const n = i => P.filter(p => p.ok[i]).length, porF = P.filter(p => p.ok[2] && !p.ok[3]).length, listas = P.filter(p => p.sig === 5).length;
+    const kp = (k, t, b, sm, col) => `<div class="kpi ukpi${s.tp === k ? ' on' : ''}" data-act="uTF" data-k="${k}" title="Filtrar"><span>${t}</span><b${col ? ` style="color:${col}"` : ''}>${b}</b><small>${sm}</small></div>`;
+    const opt = (v, t, cur) => `<option value="${v}"${cur === v ? ' selected' : ''}>${t}</option>`;
+    const nInac = D.locs.filter(l => !l.a && !l.nueva).length;
+    return `<div class="grid g4">${kp('0', 'Conteo cerrado', `${n(0)} / ${A.length}`, `${A.length - n(0)} sin cerrar`)}${kp('1', 'Con responsable', n(1), `${A.length - n(1)} sin responsable`)}${kp('3', 'Actas', `${n(2)} / ${porF}`, 'generadas / por firmar')}${kp('5', 'Listas (etiquetadas)', listas, `de ${A.length} activas`, 'var(--ok)')}</div>
+      <div class="row" style="gap:10px"><input type="search" data-in="uTQ" value="${esc(s.tq || '')}" placeholder="🔎 Buscar ubicación, edificio o responsable…" style="width:320px;max-width:100%">
+        <select data-ch="uTP">${opt('', 'Siguiente paso: todos', s.tp)}${UPASO_SIG.map((t, i) => opt(String(i), t, s.tp)).join('')}</select>
+        <select data-ch="uTG">${opt('g', 'Agrupar: edificio / tipo', s.tg)}${opt('p', 'Agrupar: siguiente paso', s.tg)}${opt('n', 'Sin agrupar', s.tg)}</select>
+        <span style="flex:1"></span><label class="row hint" style="gap:6px"><input type="checkbox" data-ch="uTI"${s.ti ? ' checked' : ''}> Mostrar inactivas (${nInac})</label></div>
+      <div id="uTW">${this.tablaBody()}</div>`;
+  },
+  tablaFiltrada() {
+    const s = UI.ubic, q = norm(s.tq || '');
+    return ordenLista().filter(l => (s.ti || l.a || l.nueva) && (s.tp === '' || String(pasosDe(l).sig) === s.tp)
+      && (!q || norm(l.n + ' ' + l.t + ' ' + l.z).includes(q) || respOf(l.n).some(p => norm(p.n).includes(q))));
+  },
+  tablaBody() {
+    const s = UI.ubic, L = this.tablaFiltrada(), sel = s.ts;
+    Object.keys(sel).forEach(k => { if (!X.loc[k]) delete sel[k]; });
+    const us = ordenLista().filter(l => sel[norm(l.n)]), nb = us.reduce((a, l) => a + sumL(X.byU[norm(l.n)] || []), 0);
+    const bar = us.length ? `<div class="uselbar"><input type="checkbox" checked data-ch="uTClr" title="Quitar selección"><b>${us.length} seleccionada${us.length === 1 ? '' : 's'}</b><span class="o">· ${fmtN(nb)} bienes · ${us.filter(l => !l.cerrada).length ? `<b style="color:#F0C58F">${us.filter(l => !l.cerrada).length} sin cerrar</b>` : 'todas cerradas'}</span><span style="flex:1"></span>
+        <button class="btn sm" data-act="uTActas" data-m="prev" type="button">👁 Vista previa</button><button class="btn sm pri" data-act="uTActas" data-m="print" type="button">🖨 Registrar e imprimir actas</button><button class="btn sm" data-act="uTActas" data-m="pdf" type="button">☁ PDF en Drive</button>
+        <button class="btn sm" data-act="uTLbl" type="button">🏷 Etiquetas (${us.reduce((a, l) => a + etqPend(l.n).length, 0)})</button><button class="btn sm" data-act="uTEtq" type="button">✓ Marcar etiquetado</button><button class="btn sm" data-act="uTClr" type="button" title="Quitar selección">✕</button></div>`
+      : '<div class="hint" style="padding:2px 2px 0">Marque una o varias ubicaciones para generar actas, imprimir etiquetas o marcar etiquetado en lote. Toque el nombre para ver el detalle.</div>';
+    if (!L.length) return bar + '<div class="empty">Nada con ese filtro.</div>';
+    const G = new Map(), gk = l => s.tg === 'p' ? 'p' + pasosDe(l).sig : s.tg === 'n' ? '' : cGrupoDe(l.n);
+    L.forEach(l => { const k = gk(l); if (!G.has(k)) G.set(k, []); G.get(k).push(l); });
+    const gName = (k, ls) => s.tg === 'p' ? UPASO_GRP[+k.slice(1)] : k[0] === 'z' ? String(ls[0].z).trim() : k.slice(2);
+    const ord = k => s.tg === 'p' ? +k.slice(1) : k[0] === 'z' ? 0 : /Otras$/.test(k) ? 2 : 1;
+    const gs = [...G.entries()].sort((a, b) => ord(a[0]) - ord(b[0]) || (s.tg === 'g' && ord(a[0]) === 0 ? gName(a[0], a[1]).localeCompare(gName(b[0], b[1]), 'es') : 0));
+    const allOn = L.every(l => sel[norm(l.n)]);
+    const rows = gs.map(([k, ls]) => {
+      const on = ls.every(l => sel[norm(l.n)]), bn = ls.reduce((a, l) => a + sumL(X.byU[norm(l.n)] || []), 0), li = ls.filter(l => pasosDe(l).sig === 5).length;
+      return (s.tg === 'n' ? '' : `<tr class="ugr"><td class="cc"><input type="checkbox" data-ch="uTGrp" data-g="${esc(k)}"${on ? ' checked' : ''}></td><td colspan="9">${esc(gName(k, ls))} <span>· ${ls.length} ubicaci${ls.length === 1 ? 'ón' : 'ones'} · ${fmtN(bn)} bienes${li ? ` · ${li} lista${li === 1 ? '' : 's'}` : ''}</span></td></tr>`) + ls.map(l => this.tRow(l)).join('');
+    }).join('');
+    return `${bar}<div class="tw utab"><table class="t"><thead><tr><th class="cc" style="width:34px"><input type="checkbox" data-ch="uTAll"${allOn ? ' checked' : ''} title="Marcar todas las visibles"></th><th>Ubicación</th><th class="n">Bienes</th>${UPASOS.map(t => `<th class="cc">${t}</th>`).join('')}<th>Siguiente paso</th><th>Último cambio</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  },
+  tRow(l) {
+    const k = norm(l.n), p = pasosDe(l), on = !!UI.ubic.ts[k], rs = respOf(l.n), f = lastFolio(l.n), off = !l.a && !l.nueva;
+    const st = p.ok.map((ok, i) => `<td class="cc"><span class="ust ${ok ? 'ok' : i === p.sig ? 'p' : 'no'}" title="${UPASO_SIG[i]}: ${ok ? 'listo' : i === p.sig ? 'siguiente' : 'pendiente'}">${ok ? '✓' : i === p.sig ? '!' : '·'}</span></td>`).join('');
+    const sub = [l.t, rs.length ? shortName(rs[0].n) + (rs.length > 1 ? ' +' + (rs.length - 1) : '') : '', f ? 'Folio ' + f : ''].filter(Boolean).join(' · ');
+    return `<tr class="${on ? 'usel' : ''}${off ? ' uoff' : ''}"><td class="cc"><input type="checkbox" data-ch="uTS" data-u="${esc(l.n)}"${on ? ' checked' : ''}></td>
+      <td><a href="#" class="uname" data-act="uTOpen" data-u="${esc(l.n)}">${esc(l.n)}</a>${l.nueva ? ' <span class="chip new">Nueva</span>' : ''}${off ? ' <span class="chip">Inactiva</span>' : ''}<span class="mini">${esc(sub || '—')}</span></td>
+      <td class="n">${fmtN(sumL(X.byU[k] || []))}</td>${st}<td>${sigChip(l, p)}</td><td class="hint" style="white-space:nowrap">${esc(ultimoCambio(l))}</td></tr>`;
   },
   list(L) {
     if (!L.length) return '<div class="empty">Nada con ese filtro.</div>';
@@ -115,6 +169,61 @@ MODS.ubic = {
   },
   t_hist(u) { setTimeout(() => cargarHist(u), 0); return '<div id="uHist" class="hint">Cargando historial…</div>'; }
 };
+const UPASOS = ['Conteo', 'Resp.', 'Acta', 'Firma', 'Etiq.'];
+const UPASO_SIG = ['Cerrar conteo', 'Asignar responsable', 'Generar acta', 'Subir acta firmada', 'Etiquetar', 'Lista'];
+const UPASO_GRP = ['Contando (sin cerrar)', 'Sin responsable', 'Sin acta', 'Por firmar', 'Por etiquetar', 'Listas'];
+/** Estado de los 5 pasos de una ubicación y el primero que falta (5 = lista). */
+function pasosDe(l) {
+  const k = norm(l.n), ac = X.actU[k] || [];
+  const ok = [!!l.cerrada, respOf(l.n).length > 0, ac.length > 0, ac.some(a => a.firmada || a.firm), !!X.etq[k]];
+  const i = ok.indexOf(false); return { ok, sig: i < 0 ? 5 : i };
+}
+/** Códigos que necesitan etiqueta nueva (todo lo que no conserva su etiqueta). */
+const etqPend = u => (X.codU[norm(u)] || []).filter(c => c.R !== 'Conservado');
+function sigChip(l, p) {
+  const u = esc(l.n);
+  if (p.sig === 0) return l.enRev ? `<button type="button" class="chip in" data-act="go" data-m="conteo" data-u="${u}">🔔 Revisar conteo</button>` : `<button type="button" class="chip" data-act="go" data-m="conteo" data-u="${u}">Cerrar conteo</button>`;
+  if (p.sig === 1) return `<button type="button" class="chip wa" data-act="uTOpen" data-u="${u}" data-k="resp">Asignar responsable</button>`;
+  if (p.sig === 2) return `<button type="button" class="chip in" data-act="uTOpen" data-u="${u}" data-k="docs">Generar acta</button>`;
+  if (p.sig === 3) return `<button type="button" class="chip re" data-act="uTOpen" data-u="${u}" data-k="docs">Subir acta firmada</button>`;
+  if (p.sig === 4) { const n = etqPend(l.n).length; return n ? `<button type="button" class="chip new" data-act="uTLbl" data-u="${u}">🏷 Imprimir ${n} etiqueta${n === 1 ? '' : 's'}</button>` : `<button type="button" class="chip new" data-act="uTEtq" data-u="${u}">Marcar etiquetado</button>`; }
+  return '<span class="chip ok">✓ Lista</span>';
+}
+function ultimoCambio(l) {
+  const k = norm(l.n), e = X.etq[k], ac = X.actU[k] || [], d = x => dt(x).slice(0, 5);
+  if (e) return 'etiquetada ' + d(e.t);
+  if (ac.some(a => a.firmada || a.firm)) return 'acta firmada';
+  if (ac.length) return 'acta ' + d(Math.max(...ac.map(a => +a.gen || 0)));
+  if (l.cerrada) return 'cerrada' + (l.rev && l.rev.res && l.rev.res.t ? ' ' + d(l.rev.res.t) : '');
+  const f = (X.byU[k] || []).map(r => r.fecha).filter(Boolean).sort().pop();
+  return f ? 'contando · ' + dmy(f) : 'sin registros';
+}
+function uTRef() { const w = $('#uTW'); if (w) w.innerHTML = MODS.ubic.tablaBody(); else render(); }
+INP.uTQ = debounce(el => { UI.ubic.tq = el.value; uTRef(); }, 200);
+INP.uTP = el => { UI.ubic.tp = el.value; render(); };
+INP.uTG = el => { UI.ubic.tg = el.value; LS.set('utg', el.value); uTRef(); };
+INP.uTI = el => { UI.ubic.ti = el.checked; uTRef(); };
+INP.uTS = el => { const k = norm(el.dataset.u); if (el.checked) UI.ubic.ts[k] = 1; else delete UI.ubic.ts[k]; uTRef(); };
+INP.uTAll = el => { MODS.ubic.tablaFiltrada().forEach(l => { const k = norm(l.n); if (el.checked) UI.ubic.ts[k] = 1; else delete UI.ubic.ts[k]; }); uTRef(); };
+INP.uTGrp = el => { const g = el.dataset.g, s = UI.ubic; MODS.ubic.tablaFiltrada().filter(l => (s.tg === 'p' ? 'p' + pasosDe(l).sig : s.tg === 'n' ? '' : cGrupoDe(l.n)) === g).forEach(l => { const k = norm(l.n); if (el.checked) s.ts[k] = 1; else delete s.ts[k]; }); uTRef(); };
+INP.uTClr = () => { UI.ubic.ts = {}; uTRef(); };
+const uTSel = () => ordenLista().filter(l => UI.ubic.ts[norm(l.n)]).map(l => l.n);
+Object.assign(ACT, {
+  uVista: b => { UI.ubic.vista = b.dataset.v; LS.set('uvista', b.dataset.v); render(); },
+  uTF: b => { UI.ubic.tp = UI.ubic.tp === b.dataset.k ? '' : b.dataset.k; render(); },
+  uTOpen: b => { UI.ubic.vista = 'det'; UI.ubic.sel = b.dataset.u; if (b.dataset.k) UI.ubic.tab = b.dataset.k; render(); scrollTo(0, 0); },
+  uTClr: () => { UI.ubic.ts = {}; uTRef(); },
+  uTActas: b => { const us = uTSel(); if (us.length) imprimirJuegos(us, b, b.dataset.m); },
+  uTLbl: b => { const us = b.dataset.u ? [b.dataset.u] : uTSel(), L = us.flatMap(etqPend); if (!L.length) { toast('Esas ubicaciones no tienen etiquetas nuevas por imprimir (todas conservan la suya).'); return; } printLabels(L); },
+  uTEtq: b => {
+    const us = (b.dataset.u ? [b.dataset.u] : uTSel()).filter(u => (X.codU[norm(u)] || []).length);
+    if (!us.length) { toast('Ninguna de esas ubicaciones tiene códigos asignados.', true); return; }
+    confirmModal(`¿Marcar como <b>etiquetadas</b> ${us.length} ubicación(es): ${esc(us.join(', '))}? Queda guardado qué código tenía cada bien al etiquetar, para avisar si luego cambia.`, 'Marcar etiquetado', async () => {
+      for (const u of us) { const r = await api('api_g_etiquetar', u, (X.codU[norm(u)] || []).map(c => [c.row.id, c.K, c.B])); D.etq = r.etq; }
+      derive(); UI.ubic.ts = {}; render(); toast(`${us.length} ubicación(es) marcadas como etiquetadas`);
+    });
+  }
+});
 async function cargarHist(u) {
   const box = $('#uHist'); if (!box) return;
   try {

@@ -151,8 +151,8 @@ Object.assign(ACT, {
     catch (e) { toast(errMsg(e), true); i.disabled = false; }
   },
   agDel: b => confirmModal('¿Borrar esta actividad?', 'Borrar', async () => { const r = await api('api_g_notaDel', b.dataset.id); D.notas = r.notas; derive(); render(); }),
-  iniGo: b => { const g = b.dataset.go, u = b.dataset.u; if (g === 'conteo') { UI.conteo.f = X.alerts.length ? 'alerta' : ''; UI.conteo.u = ''; } if (g === 'ubic' && u) { UI.ubic.sel = u; UI.ubic.tab = 'docs'; } go(g); },
-  agGo: b => { if (b.dataset.u) UI.ubic.sel = b.dataset.u; if (b.dataset.go === 'ubic') UI.ubic.tab = 'docs'; if (b.dataset.go === 'conteo') { UI.conteo.f = 'alerta'; UI.conteo.u = ''; } go(b.dataset.go); }
+  iniGo: b => { const g = b.dataset.go, u = b.dataset.u; if (g === 'conteo') { UI.conteo.f = X.alerts.length ? 'alerta' : ''; UI.conteo.u = ''; } if (g === 'ubic' && u) { UI.ubic.vista = 'det', UI.ubic.sel = u; UI.ubic.tab = 'docs'; } go(g); },
+  agGo: b => { if (b.dataset.u) UI.ubic.vista = 'det', UI.ubic.sel = b.dataset.u; if (b.dataset.go === 'ubic') UI.ubic.tab = 'docs'; if (b.dataset.go === 'conteo') { UI.conteo.f = 'alerta'; UI.conteo.u = ''; } go(b.dataset.go); }
 });
 async function notaPatch(id, patch) { const n = (D.notas || []).find(x => x.id === id); if (!n) return; const r = await api('api_g_nota', Object.assign({}, n, patch)); D.notas = r.notas; derive(); }
 INP.agDone = async el => { try { await notaPatch(el.dataset.id, { hecho: el.checked }); if (MOD === 'inicio') render(); } catch (e) { toast(errMsg(e), true); } };
@@ -205,7 +205,7 @@ Object.assign(ACT, {
   blPin: async b => { const n = D.notas.find(x => x.id === b.dataset.id); try { await blSave(Object.assign({}, n, { fijada: !n.fijada })); } catch (e) { toast(errMsg(e), true); } },
   blColor: async b => { const n = D.notas.find(x => x.id === b.dataset.id); try { await blSave(Object.assign({}, n, { color: b.dataset.c })); } catch (e) { toast(errMsg(e), true); } },
   blToAg: b => { const n = D.notas.find(x => x.id === b.dataset.id); $('#bloc').hidden = true; CAL.sel = HOY(); go('inicio'); setTimeout(() => { const i = $('#agIn'); i.value = 'mañana 8:00 ' + n.texto.slice(0, 200); i.dispatchEvent(new Event('input')); i.focus(); }, 50); },
-  blGo: b => { const v = b.dataset.v; $('#bloc').hidden = true; if (/^\d{5}-\d{4}-\d{4}$/.test(v)) { const ci = X.codBy[U(v)]; openFicha(ci != null ? fkeyCod(ci) : fkeyInv(v)); } else if (X.loc[norm(v)]) { UI.ubic.sel = v; go('ubic'); } }
+  blGo: b => { const v = b.dataset.v; $('#bloc').hidden = true; if (/^\d{5}-\d{4}-\d{4}$/.test(v)) { const ci = X.codBy[U(v)]; openFicha(ci != null ? fkeyCod(ci) : fkeyInv(v)); } else if (X.loc[norm(v)]) { UI.ubic.vista = 'det', UI.ubic.sel = v; go('ubic'); } }
 });
 INP.blPDone = async el => { const n = D.notas.find(x => x.id === el.dataset.id); try { await blSave(Object.assign({}, n, { hecho: el.checked })); } catch (e) { toast(errMsg(e), true); } };
 
@@ -291,7 +291,7 @@ ACT.srMas = b => { const g = b.dataset.g; SR.all[g] = !SR.all[g]; srRun(); };
 function srOpen(x) {
   closeSearch(); if (!x) return;
   if (x.key) { openFicha(x.key, SR.items.filter(y => y.key).map(y => y.key)); }
-  else if (x.ubic) { UI.ubic.sel = x.ubic; go('ubic'); }
+  else if (x.ubic) { UI.ubic.vista = 'det', UI.ubic.sel = x.ubic; go('ubic'); }
   else if (x.per) { go('personas'); setTimeout(() => personaModal((D.personas || []).find(p => p.id === x.per)), 50); }
   else if (x.blk) { UI.cat.q = x.blk; go('catalogo'); }
   else if (x.nota) { if (x.nota.tipo === 'actividad') { CAL.sel = x.nota.fecha; go('inicio'); } else openBloc(x.nota.tipo === 'pendiente' ? 'pendientes' : 'notas'); }
