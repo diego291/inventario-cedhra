@@ -349,6 +349,20 @@ function choose(x){
 }
 
 /* ---------- etiqueta y serie ---------- */
+/** Prefijo institucional de los códigos (los 5 primeros dígitos más comunes del inventario anterior, ej. 11674). */
+let ETQPRE='';
+function etqPre(){ if(ETQPRE) return ETQPRE; const c={}; for(const k of INV.keys()){ const m=/^(\d{5})-\d{4}-/.exec(k); if(m) c[m[1]]=(c[m[1]]||0)+1; } ETQPRE=Object.keys(c).sort((a,b)=>c[b]-c[a])[0]||''; return ETQPRE; }
+/** Pone los guiones solos (11674-1103-0015) cuando se escriben solo números que empiezan con el prefijo; series con letras u otros números no se tocan. */
+function fmtEtq(el){
+  const v=el.value; if(!/^[\d\s-]*$/.test(v)) return;
+  const d=v.replace(/\D/g,''), p=etqPre(); if(!p || d.length<=5 || !d.startsWith(p)) return;
+  const x=d.slice(0,13), out=x.slice(0,5)+'-'+x.slice(5,9)+(x.length>9?'-'+x.slice(9):'');
+  if(out===v) return;
+  const pos=el.selectionStart==null?v.length:el.selectionStart, nd=v.slice(0,pos).replace(/\D/g,'').length;
+  el.value=out;
+  let c=out.length; if(pos<v.length){ let k=0; c=0; while(c<out.length && k<nd){ if(/\d/.test(out[c])) k++; c++; } }
+  try{ el.setSelectionRange(c,c); }catch(e){}
+}
 function lookupEtq(e){
   const n=norm(e); if(!n) return null;
   const r=INV.get(n); if(r) return {rec:r,by:'código'};
@@ -899,7 +913,7 @@ function wire(){
   ib.onblur=()=>setTimeout(()=>{ sList=[]; renderSugg(); },180);
   $('#lsBien').onmousedown=e=>{ const li=e.target.closest('li'); if(!li) return; e.preventDefault(); pick(sList[+li.dataset.i]); };
   $('#goCat').onclick=()=>showTab('cat');
-  $('#inEtq').oninput=updEtq; $('#inSerie').oninput=updSerie;
+  $('#inEtq').oninput=e=>{ fmtEtq(e.target); updEtq(); }; $('#inSerie').oninput=updSerie;
   $$('.pm button').forEach(b=>b.onclick=()=>{ const i=$('#q'+b.dataset.k); i.value=Math.max(0,(parseInt(i.value)||0)+(+b.dataset.d)); updQty(); });
   ['#qb','#qr','#qm'].forEach(s=>{ const i=$(s); i.oninput=updQty; i.onfocus=()=>setTimeout(()=>i.select(),0); i.onblur=()=>{ i.value=Math.max(0,parseInt(i.value)||0); updQty(); }; });
   $('#chkRev').onchange=()=>{ $('#revWrap').hidden=!$('#chkRev').checked; if($('#chkRev').checked) $('#inRev').focus(); };
