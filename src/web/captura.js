@@ -350,38 +350,57 @@ function choose(x){
 
 /* ---------- lectura de placa (marca, modelo, serie) ---------- */
 const MARCAS=[['HP',/HEWLETT[\s-]*PACKARD|\bHP\b/],['Dell',/\bDELL\b/],['Acer',/\bACER\b/],['BenQ',/\bBEN\s?Q\b/],['AOC',/\bAOC\b|ENVISION PERIPHERALS/],['Samsung',/\bSAMSUNG\b/],['LG',/\bLG\b|LG ELECTRONICS/],['Lenovo',/\bLENOVO\b/],['ViewSonic',/\bVIEW\s?SONIC\b/],['Asus',/\bASUS(TEK)?\b/],['Philips',/\bPHILIPS\b/],['Compaq',/\bCOMPAQ\b/],['Toshiba',/\bTOSHIBA\b/],['Epson',/\bEPSON\b/],['Canon',/\bCANON\b/],['Brother',/\bBROTHER\b/],['Xerox',/\bXEROX\b/],['Sony',/\bSONY\b/],['Apple',/\bAPPLE\b/],['Hanns-G',/\bHANNS[\s.-]?G\b/],['MSI',/\bMSI\b|MICRO[\s-]STAR/],['Gateway',/\bGATEWAY\b/],['NEC',/\bNEC\b/],['Sharp',/\bSHARP\b/],['Panasonic',/\bPANASONIC\b/],['Optoma',/\bOPTOMA\b/],['Haier',/\bHAIER\b/],['APC',/\bAPC\b|AMERICAN POWER CONVERSION/],['Xtech',/\bXTECH\b/],['Klip Xtreme',/\bKLIP\s*XTREME\b/],['Genius',/\bGENIUS\b/],['Logitech',/\bLOGITECH\b/],['Kingston',/\bKINGSTON\b/],['Microsoft',/\bMICROSOFT\b/],['Hisense',/\bHISENSE\b/],['TCL',/\bTCL\b/],['Hyundai',/\bHYUNDAI\b/],['Janus',/\bJANUS\b/],['Forza',/\bFORZA\b/]];
-const PL_MODELO=[/PRODUCT\s*NAME/,/\bHP\s+MODEL\b/,/\bMODEL(?:\s*(?:NO|NUMBER|N[O°º]))?\b\.?/,/モデル名|型號|型号/];
-const PL_SERIE=[/\bSERIAL(?:\s*(?:NO|NUMBER|N[O°º]|#))?\b\.?|\bS\s*\/\s*N\b|序號|序号|\bN[O°º]?\s*DE\s*SERIE\b/];
-const PL_STOP=/^(NO|NUMBER|MODEL|SERIAL|NAME|PRODUCT|PART|REV|VERSION|TYPE|DATE|RATING|MADE|IN|CHINA|LCD|MONITOR|LISTED|CLASS)$/;
-const PL_LBL=/(\bNO\b\.?|NUMBER|RATING|TYPE|DATE|VERSION|NAME|MODEL|SERIAL|PART|\bREV\b|MANUFACTURED|ASSEMBLY|SPARES|MFG|\bS\/N\b|\bP\/N\b)|:\s*$/i;
-const plTok=s=>{ for(let t of String(s).split(/[\s:：|]+|\/(?=\s)|(?<=\s)\//)){ t=t.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g,''); if(/^[A-Za-z0-9][A-Za-z0-9.\-\/]{1,29}$/.test(t)&&/\d/.test(t)&&!PL_STOP.test(t.toUpperCase())&&!/^\d{1,3}(HZ|V|A|W)?$/i.test(t)&&!/\d+-\d+V/i.test(t)&&!/\d(HZ|VAC|VDC|V~?|MA|KG|MM)$/i.test(t)&&!/^\d+\/\d+/.test(t)) return t; } return ''; };
-/** Busca el valor de una etiqueta: en la misma línea, en la siguiente o (tablas leídas por columnas) en la línea que le toca del bloque de valores. */
-function plValor(L, U, res, okTok){
-  for(const re of res) for(let i=0;i<U.length;i++){
-    if(!re.test(U[i]) || /REGULATORY/.test(U[i])) continue;
-    const m=U[i].match(re), resto=L[i].slice((m.index||0)+m[0].length);
-    let v=plTok(resto); if(v&&okTok(v)) return v;
+/* Qué etiqueta de la placa es el modelo (de mejor a peor). "Product name" es el nombre comercial: solo si no hay "Model". */
+const PL_MODELO=[
+  [/\bMODEL\s*(?:NO|NUMBER|N[O°º]|#)\b\.?|\bMODELO\b|モデル名|型號|型号/,4],
+  [/\bHP\s+MODEL\b/,4],
+  [/\bMODEL\b\.?/,3],
+  [/PRODUCT\s*NAME|產品名稱|产品名称|\bNOMBRE\s+DEL\s+PRODUCTO\b/,1]];
+const PL_SERIE=[[/\bSERIAL\s*(?:NO|NUMBER|N[O°º]|#)?\b\.?|\bS\s*\/\s*N\b|\bS\.\s*N\.|\bSN\b|序號|序号|\bN[O°º]?\s*(?:DE\s*)?SERIE\b|\bSERIE\b/,4]];
+/* Etiquetas que NO son modelo ni serie: su valor nunca se toma (número de parte, regulatorio, versión, SNID, UPC…). */
+const PL_OTRA=/REGULATORY|\bREG\.?\s*MODEL|PRODUCT\s*(?:NUMBER|NO\b|#)|\bPART\b|\bP\s*\/\s*N\b|料號|料号|\bVERSION\b|\bREV\b|\bRATING\b|\bPOWER\b|\bINPUT\b|\bDATE\b|\bMFG\b|\bMFD\b|MANUFACTURED|\bUPC\b|\bEAN\b|\bSNID\b|ASSEMBLY|SPARES|\bCT\b|\bPPID\b|\bCAUTION\b|\bMADE IN\b|\bTYPE\b/;
+const PL_STOP=/^(NO|NUMBER|MODEL|MODELO|SERIAL|SERIE|NAME|PRODUCT|PART|REV|VERSION|TYPE|DATE|RATING|MADE|IN|CHINA|LCD|MONITOR|LISTED|CLASS)$/;
+const PL_LBL=/(\bNO\b\.?|NUMBER|RATING|TYPE|DATE|VERSION|NAME|MODEL|SERIAL|PART|\bREV\b|MANUFACTURED|ASSEMBLY|SPARES|MFG|\bS\/N\b|\bP\/N\b|\bSNID\b|\bUPC\b)|:\s*$/i;
+const plEsLbl=u=>PL_OTRA.test(u)||PL_MODELO.some(([r])=>r.test(u))||PL_SERIE.some(([r])=>r.test(u));
+const plTok=s=>{ for(let t of String(s).split(/[\s:：|]+|\/(?=\s)|(?<=\s)\//)){ t=t.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g,''); if(/^[A-Za-z0-9][A-Za-z0-9.\-\/]{1,29}$/.test(t)&&/\d/.test(t)&&!PL_STOP.test(t.toUpperCase())&&!/^\d{1,3}(HZ|V|A|W)?$/i.test(t)&&!/\d+-\d+V/i.test(t)&&!/\d(HZ|VAC|VDC|V~?|MA|KG|MM)$/i.test(t)&&!/^\d+\/\d+/.test(t)&&!/^(19|20)\d\d$/.test(t)) return t; } return ''; };
+/** Valor de una etiqueta: en la misma línea; si no, en la línea que le toca del bloque de valores (tablas leídas por columnas) o en la siguiente línea que sea solo valor (nunca en la de otra etiqueta). */
+function plValor(L, U, labels, okTok){
+  let best=null;
+  labels.forEach(([re,w])=>{ for(let i=0;i<U.length;i++){
+    const m=U[i].match(re); if(!m) continue;
+    const pre=U[i].slice(0,m.index); if(PL_OTRA.test(pre+m[0]) && !/\bHP\s+MODEL\b/.test(m[0])) continue;
+    const cand=[], resto=L[i].slice((m.index||0)+m[0].length), seg=resto.split(/\s{2,}|\s(?=(?:VERSION|REV|PART|P\/N|POWER|RATING|DATE|MFG|SNID|UPC|SERIAL|S\/N)\b)/i)[0];
+    cand.push(plTok(seg));
     let s=i; while(s>0 && !plTok(L[s-1]) && PL_LBL.test(L[s-1]) && L[s-1].length<40) s--;
     let e=i+1; while(e<L.length && !plTok(L[e]) && PL_LBL.test(L[e]) && L[e].length<40) e++;
-    if(e>i+1 || s<i){ const k=i-s, c=L[e+k]; v=c?plTok(c):''; if(v&&okTok(v)) return v; }
-    for(let j=i+1;j<=i+2&&j<L.length;j++){ v=plTok(L[j]); if(v&&okTok(v)) return v; }
-  }
-  return '';
+    if(e>i+1 || s<i){ const c=L[e+(i-s)]; if(c) cand.push(plTok(c)); }
+    for(let j=i+1;j<=i+2&&j<L.length;j++){ if(plEsLbl(U[j])) break; cand.push(plTok(L[j])); }
+    const v=cand.find(x=>x&&okTok(x)); if(v && (!best || w>best.w)) best={v,w,i};
+    if(v) break;
+  }});
+  return best?best.v:'';
 }
 function parsePlaca(texto, barras){
   const L=String(texto||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean), U=L.map(l=>norm(l)), T=U.join('\n');
   let marca='', best=0;
-  MARCAS.forEach(([n,re])=>{ const g=new RegExp(re.source,'g'), c=(T.match(g)||[]).length; if(c>best){ best=c; marca=n; } });
-  const modelo=plValor(L,U,PL_MODELO,v=>/[A-Za-z]/.test(v)||v.length>=4);
+  MARCAS.forEach(([n,re])=>{ const g=new RegExp(re.source,'g'), dom=new RegExp('WWW\\.'+n.toUpperCase().replace(/[^A-Z]/g,'')+'\\.','g'); const c=(T.match(g)||[]).length+2*(T.match(dom)||[]).length; if(c>best){ best=c; marca=n; } });
   let serie=plValor(L,U,PL_SERIE,v=>v.length>=6).toUpperCase(), deBarras=false;
   const bc=[...new Set((barras||[]).map(b=>String(b).trim().toUpperCase()))].filter(b=>/^[A-Z0-9\-]{6,30}$/.test(b) && !/^\d{11,14}$/.test(b) && !/^\d{5}-\d{4}-\d{1,4}$/.test(b));
   if(serie){ const s0=serie.replace(/[^A-Z0-9]/g,''); const h=bc.find(b=>{ const b0=b.replace(/[^A-Z0-9]/g,''); return b0===s0 || (s0.length>=6&&(b0.includes(s0)||s0.includes(b0))) || plDist(b0,s0)<=2; }); if(h){ serie=h; deBarras=true; } }
   else if(bc.length===1){ serie=bc[0]; deBarras=true; }
   if(!serie){ const d=T.match(/\b[A-Z]{2}-?0[A-Z0-9]{5}-?[A-Z0-9]{5}-?[A-Z0-9]{3}-?[A-Z0-9]{4}\b/); if(d) serie=d[0]; }
-  return { marca, modelo, serie, deBarras, score:(marca?1:0)+(modelo?1:0)+(serie?2:0)+(deBarras?1:0) };
+  const s0=serie.replace(/[^A-Z0-9]/g,'');
+  const modelo=plValor(L,U,PL_MODELO,v=>(/[A-Za-z]/.test(v)||v.length>=4) && v.length<=20 && v.toUpperCase().replace(/[^A-Z0-9]/g,'')!==s0 && !/^[A-Z0-9]{1,4}\.[A-Z0-9]{3,}\.[A-Z0-9]{2,}$/i.test(v));
+  const hits=[/MODEL|モデル|型號|型号/,/SERIAL|S\s*\/\s*N|序號|序号|SERIE/,/RATING|POWER|INPUT/,/MADE IN|DATE|MFG|MFD|MANUFACTURED/].filter(r=>r.test(T)).length;
+  return { marca, modelo, serie, deBarras, hits, score:(marca?1:0)+(modelo?1:0)+(serie?2:0)+(deBarras?1:0)+hits*.5 };
+}
+/** Une las lecturas de las 3 orientaciones: la mejor manda y las otras solo completan lo que le falte. */
+function unirPlacas(ps){
+  const o=ps.slice().sort((a,b)=>b.score-a.score), r={...o[0]};
+  for(const p of o.slice(1)) ['marca','modelo','serie'].forEach(k=>{ if(!r[k]&&p[k]){ r[k]=p[k]; if(k==='serie') r.deBarras=p.deBarras; } });
+  r.score=(r.marca?1:0)+(r.modelo?1:0)+(r.serie?2:0)+(r.deBarras?1:0)+(r.hits||0)*.5; return r;
 }
 function plDist(a,b){ if(Math.abs(a.length-b.length)>2) return 9; const d=[...Array(b.length+1).keys()]; for(let i=1;i<=a.length;i++){ let p=d[0]; d[0]=i; for(let j=1;j<=b.length;j++){ const t=d[j]; d[j]=Math.min(d[j]+1,d[j-1]+1,p+(a[i-1]===b[j-1]?0:1)); p=t; } } return d[b.length]; }
-
 let OCRGEN=0, OCRUNDO=[];
 const OCRF=[['marca','#inMarca','Marca'],['modelo','#inModelo','Modelo'],['serie','#inSerie','N° de serie']];
 /** Códigos de barras de la foto original (sin señal, en el mismo teléfono). */
@@ -418,15 +437,15 @@ async function leerPlaca(dataUrl, file, fid){
   const gen=++OCRGEN, vivo=()=>gen===OCRGEN && formFotos.some(x=>x.id===fid);
   ocrMsg('info','🔍 Leyendo la placa…');
   const barras=await leerBarras(file); if(!vivo()) return;
-  let best=parsePlaca('',barras), nota='', listo=false;
+  const lect=[parsePlaca('',barras)]; let best=lect[0], nota='', listo=false;
   if(best.serie) aplicarPlaca(best, '', online);
   if(!online){ aplicarPlaca(best,'Sin señal: solo se pudo leer el código de barras.'); return; }
   let imgs; try{ imgs=await prepOcr(dataUrl); }catch(e){ imgs=[dataUrl]; }
   await Promise.all(imgs.map(img=>run('api_ocrPlaca', img.split(',')[1]).then(r=>{
     if(listo || !vivo()) return;
     if(!r||!r.ok){ if(!nota) nota = r&&r.motivo==='api' ? 'El lector de texto de Google está desactivado en el sistema: avise al administrador.'+(ME&&ME.lvl>=3&&r.link?` <a href="${esc(r.link)}" target="_blank" rel="noopener">Activarlo aquí</a> (una sola vez).`:'') : 'No se pudo leer el texto de la placa.'; return; }
-    const p=parsePlaca(r.texto,barras); if(p.score>best.score) best=p;
-    if(best.marca&&best.modelo&&best.serie){ listo=true; aplicarPlaca(best,''); }
+    const p=parsePlaca(r.texto,barras); lect.push(p); best=unirPlacas(lect);
+    if(best.marca&&best.modelo&&best.serie&&p.hits>=2){ listo=true; aplicarPlaca(best,''); }
   }).catch(e=>{ if(!nota) nota='No se pudo leer el texto ('+esc(errMsg(e))+').'; })));
   if(!listo && vivo()) aplicarPlaca(best, nota);
 }
