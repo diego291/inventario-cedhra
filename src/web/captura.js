@@ -394,44 +394,55 @@ async function leerBarras(file){
     return (await new BarcodeDetector({formats:want}).detect(bmp)).map(b=>b.rawValue).filter(Boolean);
   }catch(e){ return []; }
 }
-async function rotarJpeg(dataUrl, deg){
-  const bmp=await createImageBitmap(await (await fetch(dataUrl)).blob()), c=document.createElement('canvas'), sw=deg%180!==0;
-  c.width=sw?bmp.height:bmp.width; c.height=sw?bmp.width:bmp.height;
-  const x=c.getContext('2d'); x.translate(c.width/2,c.height/2); x.rotate(deg*Math.PI/180); x.drawImage(bmp,-bmp.width/2,-bmp.height/2);
-  return c.toDataURL('image/jpeg',.85);
+/** Prepara la foto para el lector: gris, contraste estirado y 1400 px máx. (sube ~3 veces menos que la foto normal); devuelve 0°, 90° y 270°. */
+async function prepOcr(dataUrl){
+  const bmp=await createImageBitmap(await (await fetch(dataUrl)).blob()), k=Math.min(1,1400/Math.max(bmp.width,bmp.height));
+  const w=Math.round(bmp.width*k), h=Math.round(bmp.height*k), c=document.createElement('canvas'); c.width=w; c.height=h;
+  const x=c.getContext('2d'); x.drawImage(bmp,0,0,w,h);
+  try{
+    const im=x.getImageData(0,0,w,h), d=im.data, hist=new Uint32Array(256);
+    for(let i=0;i<d.length;i+=4){ const g=(d[i]*77+d[i+1]*150+d[i+2]*29)>>8; d[i]=g; hist[g]++; }
+    let lo=0, hi=255, acc=0, n=w*h; while(lo<255 && (acc+=hist[lo])<n*.01) lo++; acc=0; while(hi>0 && (acc+=hist[hi])<n*.01) hi--;
+    const r=hi>lo?255/(hi-lo):1; for(let i=0;i<d.length;i+=4){ const g=Math.max(0,Math.min(255,(d[i]-lo)*r)); d[i]=d[i+1]=d[i+2]=g; }
+    x.putImageData(im,0,0);
+  }catch(e){}
+  const out=[c.toDataURL('image/jpeg',.72)];
+  for(const deg of [90,270]){ const r=document.createElement('canvas'); r.width=h; r.height=w; const y=r.getContext('2d'); y.translate(h/2,w/2); y.rotate(deg*Math.PI/180); y.drawImage(c,-w/2,-h/2); out.push(r.toDataURL('image/jpeg',.72)); }
+  return out;
 }
 function ocrMsg(cls, html){ const b=$('#ocrBox'); if(!html){ b.hidden=true; b.innerHTML=''; return; } b.className='status '+cls; b.innerHTML='<span>'+html+'</span>'; b.hidden=false; }
-function ocrLimpiar(sel){ (sel?[sel]:OCRF.map(f=>f[1])).forEach(s=>{ const el=$(s); el.classList.remove('ocr-fill'); const t=el.closest('label').querySelector('.tagf'); if(t) t.remove(); }); }
+function ocrLimpiar(sel){ (sel?[sel]:OCRF.map(f=>f[1])).forEach(s=>{ const el=$(s); el.classList.remove('ocr-fill'); const t=el.closest('label').querySelector('.tagf'); if(t) t.remove(); if(sel) OCRUNDO=OCRUNDO.filter(x=>x!==s); }); }
 function ocrReset(){ OCRGEN++; OCRUNDO=[]; ocrLimpiar(); ocrMsg(); }
-/** Foto tipo "Placa / serie": lee marca, modelo y serie y llena solo los campos vacíos. */
+/** Foto tipo "Placa / serie": la serie del código de barras se pone al instante; el texto se lee girado de 3 formas a la vez y se usa la primera lectura completa. */
 async function leerPlaca(dataUrl, file, fid){
   const gen=++OCRGEN, vivo=()=>gen===OCRGEN && formFotos.some(x=>x.id===fid);
   ocrMsg('info','🔍 Leyendo la placa…');
-  const barras=await leerBarras(file);
-  let best=parsePlaca('',barras), nota='';
-  if(online){
-    for(const rot of [0,90,270]){
-      if(!vivo()) return;
-      let r; try{ r=await run('api_ocrPlaca', (rot?await rotarJpeg(dataUrl,rot):dataUrl).split(',')[1]); }catch(e){ nota='No se pudo leer el texto ('+esc(errMsg(e))+').'; break; }
-      if(!r||!r.ok){ nota = r&&r.motivo==='api' ? 'El lector de texto de Google está desactivado en el sistema: avise al administrador.'+(ME&&ME.lvl>=3&&r.link?` <a href="${esc(r.link)}" target="_blank" rel="noopener">Activarlo aquí</a> (una sola vez).`:'') : 'No se pudo leer el texto de la placa.'; break; }
-      const p=parsePlaca(r.texto,barras); if(p.score>best.score) best=p;
-      if(best.marca&&best.modelo&&best.serie) break;
-    }
-  } else nota='Sin señal: solo se pudo leer el código de barras.';
-  if(!vivo()) return;
-  aplicarPlaca(best, nota);
+  const barras=await leerBarras(file); if(!vivo()) return;
+  let best=parsePlaca('',barras), nota='', listo=false;
+  if(best.serie) aplicarPlaca(best, '', online);
+  if(!online){ aplicarPlaca(best,'Sin señal: solo se pudo leer el código de barras.'); return; }
+  let imgs; try{ imgs=await prepOcr(dataUrl); }catch(e){ imgs=[dataUrl]; }
+  await Promise.all(imgs.map(img=>run('api_ocrPlaca', img.split(',')[1]).then(r=>{
+    if(listo || !vivo()) return;
+    if(!r||!r.ok){ if(!nota) nota = r&&r.motivo==='api' ? 'El lector de texto de Google está desactivado en el sistema: avise al administrador.'+(ME&&ME.lvl>=3&&r.link?` <a href="${esc(r.link)}" target="_blank" rel="noopener">Activarlo aquí</a> (una sola vez).`:'') : 'No se pudo leer el texto de la placa.'; return; }
+    const p=parsePlaca(r.texto,barras); if(p.score>best.score) best=p;
+    if(best.marca&&best.modelo&&best.serie){ listo=true; aplicarPlaca(best,''); }
+  }).catch(e=>{ if(!nota) nota='No se pudo leer el texto ('+esc(errMsg(e))+').'; })));
+  if(!listo && vivo()) aplicarPlaca(best, nota);
 }
-function aplicarPlaca(p, nota){
-  ocrLimpiar(); OCRUNDO=[]; const llenos=[], omit=[];
+function aplicarPlaca(p, nota, parcial){
+  const llenos=[], omit=[];
   for(const [k,sel,lab] of OCRF){
     const v=p[k], el=$(sel); if(!v) continue;
-    if(el.value.trim()){ if(norm(el.value)!==norm(v)) omit.push(`${lab} (ya tenía «${esc(el.value.trim())}»; en la foto dice «${esc(v)}»)`); continue; }
-    el.value=v; el.classList.add('ocr-fill'); el.closest('label').querySelector('span').insertAdjacentHTML('beforeend','<em class="tagf">✓ de la foto</em>');
-    OCRUNDO.push(sel); llenos.push(lab);
+    const mio=OCRUNDO.includes(sel);
+    if(el.value.trim() && !mio){ if(norm(el.value)!==norm(v)) omit.push(`${lab} (ya tenía «${esc(el.value.trim())}»; en la foto dice «${esc(v)}»)`); continue; }
+    el.value=v; if(!mio){ el.classList.add('ocr-fill'); el.closest('label').querySelector('span').insertAdjacentHTML('beforeend','<em class="tagf">✓ de la foto</em>'); OCRUNDO.push(sel); }
   }
+  OCRF.forEach(([k,sel,lab])=>{ if(OCRUNDO.includes(sel)) llenos.push(lab); });
   const lista=a=>a.length>1?a.slice(0,-1).join(', ')+' y '+a[a.length-1]:a[0];
+  if(llenos.length){ $('#more').open=true; updSerie(); }
+  if(parcial){ ocrMsg('info',`🔍 Serie leída del código de barras. Leyendo marca y modelo…`); return; }
   if(llenos.length){
-    $('#more').open=true; updSerie();
     ocrMsg('ok',`🔍 Placa leída: se ${llenos.length>1?'llenaron':'llenó'} <b>${lista(llenos)}</b>${p.deBarras&&OCRUNDO.includes('#inSerie')?' (serie confirmada con el código de barras)':''}. Revise y corrija si algo salió mal. <a href="#" id="ocrUndo">Deshacer</a>${omit.length?'<br>No cambié: '+omit.join('; ')+'.':''}${nota?'<br>'+nota:''}`);
     $('#ocrUndo').onclick=e=>{ e.preventDefault(); OCRUNDO.forEach(s=>$(s).value=''); ocrLimpiar(); OCRUNDO=[]; updSerie(); ocrMsg('info','Se quitaron los datos leídos de la foto.'); };
   } else if(omit.length) ocrMsg('warn','🔍 Placa leída, pero los campos ya tenían datos. No cambié: '+omit.join('; ')+'.'+(nota?'<br>'+nota:''));
