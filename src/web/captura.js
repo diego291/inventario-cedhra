@@ -401,7 +401,7 @@ function unirPlacas(ps){
   r.score=(r.marca?1:0)+(r.modelo?1:0)+(r.serie?2:0)+(r.deBarras?1:0)+(r.hits||0)*.5; return r;
 }
 function plDist(a,b){ if(Math.abs(a.length-b.length)>2) return 9; const d=[...Array(b.length+1).keys()]; for(let i=1;i<=a.length;i++){ let p=d[0]; d[0]=i; for(let j=1;j<=b.length;j++){ const t=d[j]; d[j]=Math.min(d[j]+1,d[j-1]+1,p+(a[i-1]===b[j-1]?0:1)); p=t; } } return d[b.length]; }
-let OCRGEN=0, OCRUNDO=[];
+let OCRGEN=0, OCRUNDO=[], OCRLECT=[], OCRFOTOS=0;
 const OCRF=[['marca','#inMarca','Marca'],['modelo','#inModelo','Modelo'],['serie','#inSerie','N° de serie']];
 /** Códigos de barras de la foto original (sin señal, en el mismo teléfono). */
 async function leerBarras(file){
@@ -431,23 +431,23 @@ async function prepOcr(dataUrl){
 }
 function ocrMsg(cls, html){ const b=$('#ocrBox'); if(!html){ b.hidden=true; b.innerHTML=''; return; } b.className='status '+cls; b.innerHTML='<span>'+html+'</span>'; b.hidden=false; }
 function ocrLimpiar(sel){ (sel?[sel]:OCRF.map(f=>f[1])).forEach(s=>{ const el=$(s); el.classList.remove('ocr-fill'); const t=el.closest('label').querySelector('.tagf'); if(t) t.remove(); if(sel) OCRUNDO=OCRUNDO.filter(x=>x!==s); }); }
-function ocrReset(){ OCRGEN++; OCRUNDO=[]; ocrLimpiar(); ocrMsg(); }
+function ocrReset(){ OCRGEN++; OCRUNDO=[]; OCRLECT=[]; OCRFOTOS=0; ocrLimpiar(); ocrMsg(); }
 /** Foto tipo "Placa / serie": la serie del código de barras se pone al instante; el texto se lee girado de 3 formas a la vez y se usa la primera lectura completa. */
 async function leerPlaca(dataUrl, file, fid){
-  const gen=++OCRGEN, vivo=()=>gen===OCRGEN && formFotos.some(x=>x.id===fid);
-  ocrMsg('info','🔍 Leyendo la placa…');
+  const ses=OCRGEN, vivo=()=>ses===OCRGEN && formFotos.some(x=>x.id===fid);
+  OCRFOTOS++; ocrMsg('info',OCRFOTOS>1?'🔍 Leyendo la otra foto para completar…':'🔍 Leyendo la placa…');
   const barras=await leerBarras(file); if(!vivo()) return;
-  const lect=[parsePlaca('',barras)]; let best=lect[0], nota='', listo=false;
+  OCRLECT.push(parsePlaca('',barras)); let best=unirPlacas(OCRLECT), nota='', listo=false;
   if(best.serie) aplicarPlaca(best, '', online);
   if(!online){ aplicarPlaca(best,'Sin señal: solo se pudo leer el código de barras.'); return; }
   let imgs; try{ imgs=await prepOcr(dataUrl); }catch(e){ imgs=[dataUrl]; }
   await Promise.all(imgs.map(img=>run('api_ocrPlaca', img.split(',')[1]).then(r=>{
     if(listo || !vivo()) return;
     if(!r||!r.ok){ if(!nota) nota = r&&r.motivo==='api' ? 'El lector de texto de Google está desactivado en el sistema: avise al administrador.'+(ME&&ME.lvl>=3&&r.link?` <a href="${esc(r.link)}" target="_blank" rel="noopener">Activarlo aquí</a> (una sola vez).`:'') : 'No se pudo leer el texto de la placa.'; return; }
-    const p=parsePlaca(r.texto,barras); lect.push(p); best=unirPlacas(lect);
+    const p=parsePlaca(r.texto,barras); OCRLECT.push(p); best=unirPlacas(OCRLECT);
     if(best.marca&&best.modelo&&best.serie&&p.hits>=2){ listo=true; aplicarPlaca(best,''); }
   }).catch(e=>{ if(!nota) nota='No se pudo leer el texto ('+esc(errMsg(e))+').'; })));
-  if(!listo && vivo()) aplicarPlaca(best, nota);
+  if(!listo && vivo()) aplicarPlaca(unirPlacas(OCRLECT), nota);
 }
 function aplicarPlaca(p, nota, parcial){
   const llenos=[], omit=[];
@@ -461,11 +461,15 @@ function aplicarPlaca(p, nota, parcial){
   const lista=a=>a.length>1?a.slice(0,-1).join(', ')+' y '+a[a.length-1]:a[0];
   if(llenos.length){ $('#more').open=true; updSerie(); }
   if(parcial){ ocrMsg('info',`🔍 Serie leída del código de barras. Leyendo marca y modelo…`); return; }
+  const faltan=OCRF.filter(([k,sel])=>!$(sel).value.trim()).map(f=>f[2].replace('N° de serie','la serie').replace(/^(Marca|Modelo)$/,m=>'el '+m.toLowerCase()).replace('el marca','la marca'));
+  const otra=faltan.length?`<br><b>Falta${faltan.length>1?"n":""} ${lista(faltan)}.</b> Acérquese a esa parte de la placa: <button type="button" class="btn sm" id="ocrOtra">📷 Tomar otra foto</button>`:'';
+  const nf=OCRFOTOS>1?` (de ${OCRFOTOS} fotos)`:'';
   if(llenos.length){
-    ocrMsg('ok',`🔍 Placa leída: se ${llenos.length>1?'llenaron':'llenó'} <b>${lista(llenos)}</b>${p.deBarras&&OCRUNDO.includes('#inSerie')?' (serie confirmada con el código de barras)':''}. Revise y corrija si algo salió mal. <a href="#" id="ocrUndo">Deshacer</a>${omit.length?'<br>No cambié: '+omit.join('; ')+'.':''}${nota?'<br>'+nota:''}`);
-    $('#ocrUndo').onclick=e=>{ e.preventDefault(); OCRUNDO.forEach(s=>$(s).value=''); ocrLimpiar(); OCRUNDO=[]; updSerie(); ocrMsg('info','Se quitaron los datos leídos de la foto.'); };
-  } else if(omit.length) ocrMsg('warn','🔍 Placa leída, pero los campos ya tenían datos. No cambié: '+omit.join('; ')+'.'+(nota?'<br>'+nota:''));
-  else ocrMsg('warn','🔍 No se pudo leer marca, modelo ni serie en la foto. Tome otra más cerca, de frente y con buena luz, o escríbalos.'+(nota?'<br>'+nota:''));
+    ocrMsg('ok',`🔍 Placa leída: se ${llenos.length>1?'llenaron':'llenó'} <b>${lista(llenos)}</b>${nf}${p.deBarras&&OCRUNDO.includes('#inSerie')?' (serie confirmada con el código de barras)':''}. Revise y corrija si algo salió mal. <a href="#" id="ocrUndo">Deshacer</a>${omit.length?'<br>No cambié: '+omit.join('; ')+'.':''}${nota?'<br>'+nota:''}${otra}`);
+    $('#ocrUndo').onclick=e=>{ e.preventDefault(); OCRUNDO.forEach(s=>$(s).value=''); ocrLimpiar(); OCRUNDO=[]; OCRLECT=[]; OCRFOTOS=0; updSerie(); ocrMsg('info','Se quitaron los datos leídos de la foto.'); };
+  } else if(omit.length) ocrMsg('warn','🔍 Placa leída, pero los campos ya tenían datos. No cambié: '+omit.join('; ')+'.'+(nota?'<br>'+nota:'')+otra);
+  else ocrMsg('warn','🔍 No se pudo leer marca, modelo ni serie en la foto. Tome otra más cerca, de frente y con buena luz, o escríbalos.'+(nota?'<br>'+nota:'')+(faltan.length?' <button type="button" class="btn sm" id="ocrOtra">📷 Tomar otra foto</button>':''));
+  const bo=$('#ocrOtra'); if(bo) bo.onclick=()=>{ $('#fotoTipo').value='SERIE'; updFotoNext(); const i=document.querySelector('input[data-frmfoto][capture]'); if(i) i.click(); };
 }
 /* ---------- etiqueta y serie ---------- */
 /** Prefijo institucional de los códigos (los 5 primeros dígitos más comunes del inventario anterior, ej. 11674). */
