@@ -263,6 +263,11 @@ nav.tabs button{font-size:13.5px;padding:8px 2px}
 .logi .d{color:var(--muted);overflow-wrap:anywhere}
 .logi.alert b,.logi.alert .a{color:var(--bad)}
 .delrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13.5px;border:1px dashed var(--line);border-radius:10px;padding:8px 10px}
+
+/* Lectura de placa (v9.3) */
+input.ocr-fill{border-color:var(--ok)!important;box-shadow:0 0 0 2px var(--ok-bg)}
+.tagf{font-style:normal;font-size:11px;font-weight:600;color:var(--ok);margin-left:6px;text-transform:none;letter-spacing:0}
+#ocrBox a{color:inherit;font-weight:700}
 </style>
 
 <header class="top">
@@ -356,6 +361,7 @@ nav.tabs button{font-size:13.5px;padding:8px 2px}
           <span class="hint" id="fotoMsg"></span>
         </div>
         <span class="hint" id="fotoNext"></span>
+        <div id="ocrBox" class="status" hidden></div>
       </div>
 
       <details class="more" id="more">

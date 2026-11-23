@@ -348,6 +348,95 @@ function choose(x){
   updEtq(); updQty(); updFotoNext();
 }
 
+/* ---------- lectura de placa (marca, modelo, serie) ---------- */
+const MARCAS=[['HP',/HEWLETT[\s-]*PACKARD|\bHP\b/],['Dell',/\bDELL\b/],['Acer',/\bACER\b/],['BenQ',/\bBEN\s?Q\b/],['AOC',/\bAOC\b|ENVISION PERIPHERALS/],['Samsung',/\bSAMSUNG\b/],['LG',/\bLG\b|LG ELECTRONICS/],['Lenovo',/\bLENOVO\b/],['ViewSonic',/\bVIEW\s?SONIC\b/],['Asus',/\bASUS(TEK)?\b/],['Philips',/\bPHILIPS\b/],['Compaq',/\bCOMPAQ\b/],['Toshiba',/\bTOSHIBA\b/],['Epson',/\bEPSON\b/],['Canon',/\bCANON\b/],['Brother',/\bBROTHER\b/],['Xerox',/\bXEROX\b/],['Sony',/\bSONY\b/],['Apple',/\bAPPLE\b/],['Hanns-G',/\bHANNS[\s.-]?G\b/],['MSI',/\bMSI\b|MICRO[\s-]STAR/],['Gateway',/\bGATEWAY\b/],['NEC',/\bNEC\b/],['Sharp',/\bSHARP\b/],['Panasonic',/\bPANASONIC\b/],['Optoma',/\bOPTOMA\b/],['Haier',/\bHAIER\b/],['APC',/\bAPC\b|AMERICAN POWER CONVERSION/],['Xtech',/\bXTECH\b/],['Klip Xtreme',/\bKLIP\s*XTREME\b/],['Genius',/\bGENIUS\b/],['Logitech',/\bLOGITECH\b/],['Kingston',/\bKINGSTON\b/],['Microsoft',/\bMICROSOFT\b/],['Hisense',/\bHISENSE\b/],['TCL',/\bTCL\b/],['Hyundai',/\bHYUNDAI\b/],['Janus',/\bJANUS\b/],['Forza',/\bFORZA\b/]];
+const PL_MODELO=[/PRODUCT\s*NAME/,/\bHP\s+MODEL\b/,/\bMODEL(?:\s*(?:NO|NUMBER|N[O°º]))?\b\.?/,/モデル名|型號|型号/];
+const PL_SERIE=[/\bSERIAL(?:\s*(?:NO|NUMBER|N[O°º]|#))?\b\.?|\bS\s*\/\s*N\b|序號|序号|\bN[O°º]?\s*DE\s*SERIE\b/];
+const PL_STOP=/^(NO|NUMBER|MODEL|SERIAL|NAME|PRODUCT|PART|REV|VERSION|TYPE|DATE|RATING|MADE|IN|CHINA|LCD|MONITOR|LISTED|CLASS)$/;
+const PL_LBL=/(\bNO\b\.?|NUMBER|RATING|TYPE|DATE|VERSION|NAME|MODEL|SERIAL|PART|\bREV\b|MANUFACTURED|ASSEMBLY|SPARES|MFG|\bS\/N\b|\bP\/N\b)|:\s*$/i;
+const plTok=s=>{ for(let t of String(s).split(/[\s:：|]+|\/(?=\s)|(?<=\s)\//)){ t=t.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g,''); if(/^[A-Za-z0-9][A-Za-z0-9.\-\/]{1,29}$/.test(t)&&/\d/.test(t)&&!PL_STOP.test(t.toUpperCase())&&!/^\d{1,3}(HZ|V|A|W)?$/i.test(t)&&!/\d+-\d+V/i.test(t)&&!/\d(HZ|VAC|VDC|V~?|MA|KG|MM)$/i.test(t)&&!/^\d+\/\d+/.test(t)) return t; } return ''; };
+/** Busca el valor de una etiqueta: en la misma línea, en la siguiente o (tablas leídas por columnas) en la línea que le toca del bloque de valores. */
+function plValor(L, U, res, okTok){
+  for(const re of res) for(let i=0;i<U.length;i++){
+    if(!re.test(U[i]) || /REGULATORY/.test(U[i])) continue;
+    const m=U[i].match(re), resto=L[i].slice((m.index||0)+m[0].length);
+    let v=plTok(resto); if(v&&okTok(v)) return v;
+    let s=i; while(s>0 && !plTok(L[s-1]) && PL_LBL.test(L[s-1]) && L[s-1].length<40) s--;
+    let e=i+1; while(e<L.length && !plTok(L[e]) && PL_LBL.test(L[e]) && L[e].length<40) e++;
+    if(e>i+1 || s<i){ const k=i-s, c=L[e+k]; v=c?plTok(c):''; if(v&&okTok(v)) return v; }
+    for(let j=i+1;j<=i+2&&j<L.length;j++){ v=plTok(L[j]); if(v&&okTok(v)) return v; }
+  }
+  return '';
+}
+function parsePlaca(texto, barras){
+  const L=String(texto||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean), U=L.map(l=>norm(l)), T=U.join('\n');
+  let marca='', best=0;
+  MARCAS.forEach(([n,re])=>{ const g=new RegExp(re.source,'g'), c=(T.match(g)||[]).length; if(c>best){ best=c; marca=n; } });
+  const modelo=plValor(L,U,PL_MODELO,v=>/[A-Za-z]/.test(v)||v.length>=4);
+  let serie=plValor(L,U,PL_SERIE,v=>v.length>=6).toUpperCase(), deBarras=false;
+  const bc=[...new Set((barras||[]).map(b=>String(b).trim().toUpperCase()))].filter(b=>/^[A-Z0-9\-]{6,30}$/.test(b) && !/^\d{11,14}$/.test(b) && !/^\d{5}-\d{4}-\d{1,4}$/.test(b));
+  if(serie){ const s0=serie.replace(/[^A-Z0-9]/g,''); const h=bc.find(b=>{ const b0=b.replace(/[^A-Z0-9]/g,''); return b0===s0 || (s0.length>=6&&(b0.includes(s0)||s0.includes(b0))) || plDist(b0,s0)<=2; }); if(h){ serie=h; deBarras=true; } }
+  else if(bc.length===1){ serie=bc[0]; deBarras=true; }
+  if(!serie){ const d=T.match(/\b[A-Z]{2}-?0[A-Z0-9]{5}-?[A-Z0-9]{5}-?[A-Z0-9]{3}-?[A-Z0-9]{4}\b/); if(d) serie=d[0]; }
+  return { marca, modelo, serie, deBarras, score:(marca?1:0)+(modelo?1:0)+(serie?2:0)+(deBarras?1:0) };
+}
+function plDist(a,b){ if(Math.abs(a.length-b.length)>2) return 9; const d=[...Array(b.length+1).keys()]; for(let i=1;i<=a.length;i++){ let p=d[0]; d[0]=i; for(let j=1;j<=b.length;j++){ const t=d[j]; d[j]=Math.min(d[j]+1,d[j-1]+1,p+(a[i-1]===b[j-1]?0:1)); p=t; } } return d[b.length]; }
+
+let OCRGEN=0, OCRUNDO=[];
+const OCRF=[['marca','#inMarca','Marca'],['modelo','#inModelo','Modelo'],['serie','#inSerie','N° de serie']];
+/** Códigos de barras de la foto original (sin señal, en el mismo teléfono). */
+async function leerBarras(file){
+  try{
+    if(!('BarcodeDetector' in window)) return [];
+    const sup=await BarcodeDetector.getSupportedFormats(), want=['code_128','code_39','code_93','codabar','itf','ean_13','ean_8','upc_a','upc_e','qr_code','data_matrix','pdf417'].filter(x=>sup.includes(x));
+    if(!want.length) return [];
+    const bmp=await createImageBitmap(file);
+    return (await new BarcodeDetector({formats:want}).detect(bmp)).map(b=>b.rawValue).filter(Boolean);
+  }catch(e){ return []; }
+}
+async function rotarJpeg(dataUrl, deg){
+  const bmp=await createImageBitmap(await (await fetch(dataUrl)).blob()), c=document.createElement('canvas'), sw=deg%180!==0;
+  c.width=sw?bmp.height:bmp.width; c.height=sw?bmp.width:bmp.height;
+  const x=c.getContext('2d'); x.translate(c.width/2,c.height/2); x.rotate(deg*Math.PI/180); x.drawImage(bmp,-bmp.width/2,-bmp.height/2);
+  return c.toDataURL('image/jpeg',.85);
+}
+function ocrMsg(cls, html){ const b=$('#ocrBox'); if(!html){ b.hidden=true; b.innerHTML=''; return; } b.className='status '+cls; b.innerHTML='<span>'+html+'</span>'; b.hidden=false; }
+function ocrLimpiar(sel){ (sel?[sel]:OCRF.map(f=>f[1])).forEach(s=>{ const el=$(s); el.classList.remove('ocr-fill'); const t=el.closest('label').querySelector('.tagf'); if(t) t.remove(); }); }
+function ocrReset(){ OCRGEN++; OCRUNDO=[]; ocrLimpiar(); ocrMsg(); }
+/** Foto tipo "Placa / serie": lee marca, modelo y serie y llena solo los campos vacíos. */
+async function leerPlaca(dataUrl, file, fid){
+  const gen=++OCRGEN, vivo=()=>gen===OCRGEN && formFotos.some(x=>x.id===fid);
+  ocrMsg('info','🔍 Leyendo la placa…');
+  const barras=await leerBarras(file);
+  let best=parsePlaca('',barras), nota='';
+  if(online){
+    for(const rot of [0,90,270]){
+      if(!vivo()) return;
+      let r; try{ r=await run('api_ocrPlaca', (rot?await rotarJpeg(dataUrl,rot):dataUrl).split(',')[1]); }catch(e){ nota='No se pudo leer el texto ('+esc(errMsg(e))+').'; break; }
+      if(!r||!r.ok){ nota = r&&r.motivo==='api' ? 'El lector de texto de Google está desactivado en el sistema: avise al administrador.'+(ME&&ME.lvl>=3&&r.link?` <a href="${esc(r.link)}" target="_blank" rel="noopener">Activarlo aquí</a> (una sola vez).`:'') : 'No se pudo leer el texto de la placa.'; break; }
+      const p=parsePlaca(r.texto,barras); if(p.score>best.score) best=p;
+      if(best.marca&&best.modelo&&best.serie) break;
+    }
+  } else nota='Sin señal: solo se pudo leer el código de barras.';
+  if(!vivo()) return;
+  aplicarPlaca(best, nota);
+}
+function aplicarPlaca(p, nota){
+  ocrLimpiar(); OCRUNDO=[]; const llenos=[], omit=[];
+  for(const [k,sel,lab] of OCRF){
+    const v=p[k], el=$(sel); if(!v) continue;
+    if(el.value.trim()){ if(norm(el.value)!==norm(v)) omit.push(`${lab} (ya tenía «${esc(el.value.trim())}»; en la foto dice «${esc(v)}»)`); continue; }
+    el.value=v; el.classList.add('ocr-fill'); el.closest('label').querySelector('span').insertAdjacentHTML('beforeend','<em class="tagf">✓ de la foto</em>');
+    OCRUNDO.push(sel); llenos.push(lab);
+  }
+  const lista=a=>a.length>1?a.slice(0,-1).join(', ')+' y '+a[a.length-1]:a[0];
+  if(llenos.length){
+    $('#more').open=true; updSerie();
+    ocrMsg('ok',`🔍 Placa leída: se ${llenos.length>1?'llenaron':'llenó'} <b>${lista(llenos)}</b>${p.deBarras&&OCRUNDO.includes('#inSerie')?' (serie confirmada con el código de barras)':''}. Revise y corrija si algo salió mal. <a href="#" id="ocrUndo">Deshacer</a>${omit.length?'<br>No cambié: '+omit.join('; ')+'.':''}${nota?'<br>'+nota:''}`);
+    $('#ocrUndo').onclick=e=>{ e.preventDefault(); OCRUNDO.forEach(s=>$(s).value=''); ocrLimpiar(); OCRUNDO=[]; updSerie(); ocrMsg('info','Se quitaron los datos leídos de la foto.'); };
+  } else if(omit.length) ocrMsg('warn','🔍 Placa leída, pero los campos ya tenían datos. No cambié: '+omit.join('; ')+'.'+(nota?'<br>'+nota:''));
+  else ocrMsg('warn','🔍 No se pudo leer marca, modelo ni serie en la foto. Tome otra más cerca, de frente y con buena luz, o escríbalos.'+(nota?'<br>'+nota:''));
+}
 /* ---------- etiqueta y serie ---------- */
 /** Prefijo institucional de los códigos (los 5 primeros dígitos más comunes del inventario anterior, ej. 11674). */
 let ETQPRE='';
@@ -455,9 +544,10 @@ function resetForm(){
   ['#qb','#qr','#qm'].forEach(s=>$(s).value='0');
   $('#chkRev').checked=false; $('#revWrap').hidden=true; $('#fotoTipo').value='';
   $('#selInst').value=''; $('#frmErr').hidden=true; $('#more').open=false; $('#serieStatus').hidden=true; $('#fotoMsg').textContent='';
-  renderFormFotos(); updEtq(); updQty(); renderItems();
+  ocrReset(); renderFormFotos(); updEtq(); updQty(); renderItems();
 }
 function loadRow(r, asCopy){
+  ocrReset();
   editingId = asCopy ? null : r.id;
   $('#frmTitle').textContent = asCopy ? 'Nuevo registro (copia)' : 'Editando registro';
   $('#btnCancel').textContent = asCopy ? 'Limpiar' : 'Cancelar edición'; $('#btnSave').textContent = asCopy ? 'Guardar registro' : 'Guardar cambios';
@@ -887,7 +977,7 @@ async function onPhotoInput(input, forLoc){
       enqueue('api_uploadPhoto',[lid, want],'', 'Foto '+want);
       const ref={id:'local:'+lid, n:want};
       if(forLoc){ window.__locPatch(u,{fotoAdd:ref},'Foto general de '+u); msgEl.textContent='Foto guardada: '+want; }
-      else { formFotos.push({...ref, t:$('#fotoTipo').value, p:ME?ME.nombre:'', d:Date.now()}); renderFormFotos(); msgEl.textContent='Lista: '+want+(online?'':' · se subirá al volver la señal'); }
+      else { formFotos.push({...ref, t:$('#fotoTipo').value, p:ME?ME.nombre:'', d:Date.now()}); renderFormFotos(); if($('#fotoTipo').value==='SERIE') leerPlaca(dataUrl, f, ref.id); msgEl.textContent='Lista: '+want+(online?'':' · se subirá al volver la señal'); }
     }catch(err){ msgEl.textContent='No se pudo preparar la foto: '+errMsg(err); }
     finally{ uploads--; }
   }
@@ -913,7 +1003,7 @@ function wire(){
   ib.onblur=()=>setTimeout(()=>{ sList=[]; renderSugg(); },180);
   $('#lsBien').onmousedown=e=>{ const li=e.target.closest('li'); if(!li) return; e.preventDefault(); pick(sList[+li.dataset.i]); };
   $('#goCat').onclick=()=>showTab('cat');
-  $('#inEtq').oninput=e=>{ fmtEtq(e.target); updEtq(); }; $('#inSerie').oninput=updSerie;
+  $('#inEtq').oninput=e=>{ fmtEtq(e.target); updEtq(); }; $('#inSerie').oninput=()=>{ ocrLimpiar('#inSerie'); updSerie(); }; $('#inMarca').addEventListener('input',()=>ocrLimpiar('#inMarca')); $('#inModelo').addEventListener('input',()=>ocrLimpiar('#inModelo'));
   $$('.pm button').forEach(b=>b.onclick=()=>{ const i=$('#q'+b.dataset.k); i.value=Math.max(0,(parseInt(i.value)||0)+(+b.dataset.d)); updQty(); });
   ['#qb','#qr','#qm'].forEach(s=>{ const i=$(s); i.oninput=updQty; i.onfocus=()=>setTimeout(()=>i.select(),0); i.onblur=()=>{ i.value=Math.max(0,parseInt(i.value)||0); updQty(); }; });
   $('#chkRev').onchange=()=>{ $('#revWrap').hidden=!$('#chkRev').checked; if($('#chkRev').checked) $('#inRev').focus(); };

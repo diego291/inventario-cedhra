@@ -701,6 +701,37 @@ function api_uploadPhoto(tok, b64, name) {
     return { id: file.getId(), n: n };
   });
 }
+/** Lee el texto de una foto de placa (marca, modelo, serie) con el lector de texto de Google Drive.
+ *  Sube la imagen convertida a Documento (Drive hace el OCR), exporta el texto y borra el archivo temporal.
+ *  Usa los permisos que ya tiene el proyecto (drive + external_request). */
+function api_ocrPlaca(tok, b64) {
+  auth_(tok);
+  b64 = String(b64 || '').replace(/^data:image\/\w+;base64,/, '');
+  if (!b64) throw valErr_('Falta la foto.');
+  if (b64.length > 14000000) throw valErr_('La foto es demasiado grande.');
+  var H = { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }, B = 'ocrplaca' + Date.now();
+  var meta = JSON.stringify({ name: 'tmp_ocr_placa_' + Date.now(), mimeType: 'application/vnd.google-apps.document' });
+  var body = Utilities.newBlob('--' + B + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + meta + '\r\n--' + B + '\r\nContent-Type: image/jpeg\r\n\r\n').getBytes()
+    .concat(Utilities.base64Decode(b64)).concat(Utilities.newBlob('\r\n--' + B + '--').getBytes());
+  var r = UrlFetchApp.fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&ocrLanguage=en&fields=id', {
+    method: 'post', contentType: 'multipart/related; boundary=' + B, payload: body, headers: H, muteHttpExceptions: true });
+  var code = r.getResponseCode(), txt = r.getContentText();
+  if (code !== 200) {
+    if (/accessNotConfigured|SERVICE_DISABLED|has not been used/i.test(txt)) {
+      var m = txt.match(/https:\/\/console\.(?:developers|cloud)\.google\.com\/[^"\s]+/);
+      return { ok: false, motivo: 'api', link: m ? m[0] : '' };
+    }
+    return { ok: false, motivo: 'error', msg: 'Drive respondió ' + code };
+  }
+  var id = JSON.parse(txt).id, out = '';
+  try {
+    var e = UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/' + id + '/export?mimeType=text/plain', { headers: H, muteHttpExceptions: true });
+    out = e.getResponseCode() === 200 ? e.getContentText('UTF-8') : '';
+  } finally {
+    try { UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/' + id, { method: 'delete', headers: H, muteHttpExceptions: true }); } catch (x) {}
+  }
+  return { ok: true, texto: String(out).replace(/^﻿/, '').slice(0, 20000) };
+}
 function api_getImage(tok, id) {
   auth_(tok);
   var file = DriveApp.getFileById(id), ok = false;
