@@ -653,7 +653,7 @@ function renderItems(){
   $('#locAlerts').insertAdjacentHTML('beforeend', dels.length?`<details class="more"><summary>Eliminados en esta ubicación que puede restaurar (${dels.length})</summary><div style="display:flex;flex-direction:column;gap:6px">${dels.map(d=>`<div class="delrow"><span class="mono">${esc(d.blk||'¿?')}</span><span style="flex:1;min-width:0">${esc(d.blk?((CAT.get(d.blk)||{}).d||''):d.desc)} · ${d.cant} u.<br><span class="hint">${esc(d.del)}</span></span><button type="button" class="btn sm" data-restore="${esc(d.id)}">Restaurar</button></div>`).join('')}</div></details>`:'');
   if(!u){ $('#items').innerHTML='<div class="empty">Elija una ubicación para empezar.</div>'; return; }
   if(!list.length){ $('#items').innerHTML=`<div class="empty">${f?'Nada coincide con el filtro.':'Aún no hay registros aquí. Busque el primer bien arriba.'}</div>`; return; }
-  $('#items').innerHTML=list.map(r=>{
+  const itemHTML=r=>{
     const v=r.etq?etqVerdict(r.etq,r.blk):null, d=r.etq?dupEtq(r.etq,r.id):[], chips=[];
     if(r.etq) chips.push(`<span class="chip ${v?v.cls:'mut'} mono">${esc(r.etq)}</span>`, v?`<span class="chip ${v.cls}">${esc(v.chip)}</span>`:'');
     else chips.push('<span class="chip mut">Sin etiqueta · código lo asigna el Excel</span>');
@@ -670,9 +670,30 @@ function renderItems(){
       <div class="sub">${chips.join('')}<span>· ${esc((r.cont||'').split(' ')[0])}${r.editadoPor?' (editó '+esc(r.editadoPor.split(' ')[0])+')':''} · ${esc(r.fecha||'')}</span></div>
       <div class="acts" data-id="${esc(r.id)}"><button class="btn sm" data-a="copy" type="button">Duplicar</button>${canEdit(r)?'<button class="btn sm" data-a="edit" type="button">Editar</button><button class="btn sm danger" data-a="del" type="button">Eliminar</button>':`<span class="hint">${lk?'🔒 Ubicación cerrada: solo un supervisor puede reabrirla':'🔒 Solo quien lo registró (el mismo día) o un supervisor puede cambiarlo'}</span>`}</div>
     </div>`;
+  };
+  $('#items').innerHTML=agruparItems(list, itemHTML, !!f);
+}
+/* ---------- subtotal por rubro y familia ---------- */
+const FAMOPEN=new Set(), FAMCLOSED=new Set();
+function agruparItems(list, itemHTML, todoAbierto){
+  const fam=new Map();
+  list.forEach(r=>{ const k=r.blk||'¿?'; if(!fam.has(k)) fam.set(k,[]); fam.get(k).push(r); });
+  const rub=new Map();
+  [...fam.entries()].forEach(([k,rs])=>{ const c=CAT.get(k), ru=String((c&&c.r)||(k==='¿?'?'Fuera de catálogo':'Sin rubro')).trim(); if(!rub.has(ru)) rub.set(ru,[]); rub.get(ru).push([k,rs,c]); });
+  const sum=rs=>rs.reduce((a,r)=>({b:a.b+(+r.b||0),r:a.r+(+r.r||0),m:a.m+(+r.m||0)}),{b:0,r:0,m:0});
+  const pills=t=>`<span class="pill pb">${t.b}</span><span class="pill pr">${t.r}</span><span class="pill pm">${t.m}</span><span class="pill pt">${t.b+t.r+t.m}</span>`;
+  const actual=chosen&&chosen.c, edit=editingId&&(list.find(r=>r.id===editingId)||{}).blk;
+  return [...rub.entries()].sort((a,b)=>(a[0]==='Fuera de catálogo')-(b[0]==='Fuera de catálogo')||a[0].localeCompare(b[0],'es')).map(([ru,fs])=>{
+    const t=sum(fs.flatMap(x=>x[1]));
+    return `<div class="rgrp"><div class="rhead"><span>${esc(ru)}</span><span class="pills">${pills(t)}</span></div>`+fs.sort((a,b)=>a[0].localeCompare(b[0],'es',{numeric:true})).map(([k,rs,c])=>{
+      const op=todoAbierto||FAMOPEN.has(k)||((k===actual||k===edit)&&!FAMCLOSED.has(k)), st=sum(rs), d=c?c.d:(k==='¿?'?'Bienes fuera de catálogo':bienDesc(rs[0]));
+      return `<div class="fgrp${op?' open':''}"><button type="button" class="fhead" data-fam="${esc(k)}" aria-expanded="${op}"><span class="car">${op?'▾':'▸'}</span><span class="mono">${esc(k)}</span><b>${esc(d)}</b><span class="hint">${rs.length} reg.</span><span class="pills">${pills(st)}</span></button>${op?`<div class="items fitems">${rs.map(itemHTML).join('')}</div>`:''}</div>`;
+    }).join('')+'</div>';
   }).join('');
 }
 async function onItemAct(e){
+  const h=e.target.closest('button[data-fam]');
+  if(h){ const k=h.dataset.fam; if(h.getAttribute('aria-expanded')==='true'){ FAMOPEN.delete(k); if(chosen&&chosen.c===k||(editingId&&(ROWS.get(editingId)||{}).blk===k)) FAMCLOSED.add(k); } else { FAMOPEN.add(k); FAMCLOSED.delete(k); } renderItems(); return; }
   const b=e.target.closest('button[data-a]'); if(!b) return;
   const id=b.parentElement.dataset.id, u=curUbic(), s=slug(u), r=(STATE[s]&&STATE[s].items[id]); if(!r) return;
   if((b.dataset.a==='edit'||b.dataset.a==='del') && !canEdit(r)){ toast('No puede cambiar este registro'); return; }

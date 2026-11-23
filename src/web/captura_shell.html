@@ -268,6 +268,18 @@ nav.tabs button{font-size:13.5px;padding:8px 2px}
 input.ocr-fill{border-color:var(--ok)!important;box-shadow:0 0 0 2px var(--ok-bg)}
 .tagf{font-style:normal;font-size:11px;font-weight:600;color:var(--ok);margin-left:6px;text-transform:none;letter-spacing:0}
 #ocrBox a{color:inherit;font-weight:700}
+
+/* Subtotal por rubro y familia (v9.4) */
+.rgrp{display:flex;flex-direction:column;gap:8px}.rgrp+.rgrp{margin-top:6px}
+.rhead{display:flex;align-items:center;gap:10px;font-weight:800;font-size:15px;padding:4px 2px;text-transform:uppercase;letter-spacing:.02em}
+.pills{margin-left:auto;display:flex;gap:5px;flex:none}
+.pill{display:inline-flex;min-width:28px;justify-content:center;padding:2px 7px;border-radius:999px;font-weight:700;font-size:12.5px;font-variant-numeric:tabular-nums;text-transform:none}
+.pill.pb{background:var(--ok-bg);color:var(--b)}.pill.pr{background:var(--warn-bg);color:var(--r)}.pill.pm{background:var(--bad-bg);color:var(--m)}.pill.pt{background:var(--surface2);color:var(--fg);font-size:13.5px}
+.fhead{display:flex;align-items:center;gap:8px;width:100%;text-align:left;font:inherit;color:var(--fg);cursor:pointer;padding:9px 11px;border-radius:10px;background:var(--surface2);border:1px solid var(--line);min-height:44px}
+.fhead .car{color:var(--muted);width:12px}.fhead b{font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.fhead .hint{white-space:nowrap}
+.fgrp.open>.fhead{border-color:var(--accent)}
+.fitems{padding-left:10px;border-left:2px solid var(--accent);margin:2px 0 4px 6px}
+@media (max-width:520px){.fhead .hint{display:none}.pill{min-width:24px;padding:2px 5px}}
 </style>
 
 <header class="top">
