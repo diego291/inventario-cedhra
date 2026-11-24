@@ -259,13 +259,17 @@ function updFotoNext(){
   const u=curUbic();
   $('#fotoNext').textContent = (u && chosen) ? 'La próxima foto se llamará: '+nextPhotoName(u, chosen.c, $('#inFecha').value, $('#fotoTipo').value) : 'Elija ubicación y bien para ver el nombre que recibirá la foto.';
 }
+/** Abre la foto ya reducida (la cámara entrega 12–50 MP: abrirla completa usa 50–200 MB y Android cierra el navegador). */
+async function bitmapReducido(file, lado){
+  try{ return await createImageBitmap(file,{resizeWidth:lado,resizeQuality:'medium'}); }catch(e){ return await createImageBitmap(file); }
+}
 async function toJpegDataUrl(file){
   try{
-    const bmp=await createImageBitmap(file);
+    const bmp=await bitmapReducido(file,1600);
     const s=Math.min(1,1600/Math.max(bmp.width,bmp.height));
     const c=document.createElement('canvas'); c.width=Math.round(bmp.width*s); c.height=Math.round(bmp.height*s);
-    c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
-    return c.toDataURL('image/jpeg',.82);
+    c.getContext('2d').drawImage(bmp,0,0,c.width,c.height); if(bmp.close) bmp.close();
+    const out=c.toDataURL('image/jpeg',.82); c.width=c.height=0; return out;
   }catch(e){
     return await new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=rej; fr.readAsDataURL(file); });
   }
@@ -349,49 +353,62 @@ function choose(x){
 }
 
 /* ---------- lectura de placa (marca, modelo, serie) ---------- */
-const MARCAS=[['HP',/HEWLETT[\s-]*PACKARD|\bHP\b/],['Dell',/\bDELL\b/],['Acer',/\bACER\b/],['BenQ',/\bBEN\s?Q\b/],['AOC',/\bAOC\b|ENVISION PERIPHERALS/],['Samsung',/\bSAMSUNG\b/],['LG',/\bLG\b|LG ELECTRONICS/],['Lenovo',/\bLENOVO\b/],['ViewSonic',/\bVIEW\s?SONIC\b/],['Asus',/\bASUS(TEK)?\b/],['Philips',/\bPHILIPS\b/],['Compaq',/\bCOMPAQ\b/],['Toshiba',/\bTOSHIBA\b/],['Epson',/\bEPSON\b/],['Canon',/\bCANON\b/],['Brother',/\bBROTHER\b/],['Xerox',/\bXEROX\b/],['Sony',/\bSONY\b/],['Apple',/\bAPPLE\b/],['Hanns-G',/\bHANNS[\s.-]?G\b/],['MSI',/\bMSI\b|MICRO[\s-]STAR/],['Gateway',/\bGATEWAY\b/],['NEC',/\bNEC\b/],['Sharp',/\bSHARP\b/],['Panasonic',/\bPANASONIC\b/],['Optoma',/\bOPTOMA\b/],['Haier',/\bHAIER\b/],['APC',/\bAPC\b|AMERICAN POWER CONVERSION/],['Xtech',/\bXTECH\b/],['Klip Xtreme',/\bKLIP\s*XTREME\b/],['Genius',/\bGENIUS\b/],['Logitech',/\bLOGITECH\b/],['Kingston',/\bKINGSTON\b/],['Microsoft',/\bMICROSOFT\b/],['Hisense',/\bHISENSE\b/],['TCL',/\bTCL\b/],['Hyundai',/\bHYUNDAI\b/],['Janus',/\bJANUS\b/],['Forza',/\bFORZA\b/]];
-/* Qué etiqueta de la placa es el modelo (de mejor a peor). "Product name" es el nombre comercial: solo si no hay "Model". */
+const MARCAS=[['HP',/HEWLETT[\s-]*PACKARD|\bHP\b/],['Dell',/\bDELL\b/],['Acer',/\bACER\b/],['BenQ',/\bBEN\s?Q\b/],['AOC',/\bAOC\b|ENVISION PERIPHERALS/],['Samsung',/\bSAMSUNG\b/],['LG',/\bLG\b|LG ELECTRONICS/],['Lenovo',/\bLENOVO\b/],['ViewSonic',/\bVIEW\s?SONIC\b/],['Asus',/\bASUS(TEK)?\b/],['Philips',/\bPHILIPS\b/],['Compaq',/\bCOMPAQ\b/],['Toshiba',/\bTOSHIBA\b/],['Epson',/\bEPSON\b/],['Canon',/\bCANON\b/],['Brother',/\bBROTHER\b/],['Xerox',/\bXEROX\b/],['Kyocera',/\bKYOCERA\b|\bMITA\b/],['Ricoh',/\bRICOH\b/],['Sony',/\bSONY\b/],['Apple',/\bAPPLE\b/],['Hanns-G',/\bHANNS[\s.-]?G\b/],['MSI',/\bMSI\b|MICRO[\s-]STAR/],['Gateway',/\bGATEWAY\b/],['NEC',/\bNEC\b/],['Sharp',/\bSHARP\b/],['Panasonic',/\bPANASONIC\b/],['Optoma',/\bOPTOMA\b/],['Haier',/\bHAIER\b/],['APC',/\bAPC\b|AMERICAN POWER CONVERSION/],['Centra',/\bCENTRA\b/],['CDP',/\bCDP\b/],['Forza',/\bFORZA\b/],['Tripp Lite',/\bTRIPP[\s-]?LITE\b/],['Orbitec',/\bORBITEC\b/],['Xtech',/\bXTECH\b/],['Klip Xtreme',/\bKLIP\s*XTREME\b/],['Genius',/\bGENIUS\b/],['Logitech',/\bLOGITECH\b/],['Kingston',/\bKINGSTON\b/],['Microsoft',/\bMICROSOFT\b/],['Hisense',/\bHISENSE\b/],['TCL',/\bTCL\b/],['Hyundai',/\bHYUNDAI\b/],['Janus',/\bJANUS\b/],['General Electric',/\bGENERAL ELECTRIC\b/],['Mabe',/\bMABE\b/],['Whirlpool',/\bWHIRLPOOL\b/],['Frigidaire',/\bFRIGIDAIRE\b/],['Oster',/\bOSTER\b/],['Black & Decker',/BLACK\s*(&|AND)\s*DECKER/],['Yamaha',/\bYAMAHA\b/],['Pioneer',/\bPIONEER\b/],['JBL',/\bJBL\b/],['Steren',/\bSTEREN\b/],['Huawei',/\bHUAWEI\b/],['TP-Link',/\bTP[\s-]?LINK\b/],['Cisco',/\bCISCO\b/],['D-Link',/\bD[\s-]?LINK\b/],['Ubiquiti',/\bUBIQUITI\b/],['Intel',/\bINTEL\b/],['UNNO Tekno',/\bUNNO\b/]];
+/* Etiquetas (lo que va antes del valor). Modelo: "Product name" es el nombre comercial, solo si no hay "Model". */
+const PL_MARCA=[[/\bMARCA\b|\bBRAND\b|\bMANUFACTURER\b|\bFABRICANTE\b|\bTRADEMARK\b/,4]];
 const PL_MODELO=[
-  [/\bMODEL\s*(?:NO|NUMBER|N[O°º]|#)\b\.?|\bMODELO\b|モデル名|型號|型号/,4],
+  [/\bMODEL\s*(?:NO|NUMBER|N[O°º]|#)\b\.?|\bMODELO\b|\bMOD\.|モデル名|型號|型号/,4],
   [/\bHP\s+MODEL\b/,4],
   [/\bMODEL\b\.?/,3],
   [/PRODUCT\s*NAME|產品名稱|产品名称|\bNOMBRE\s+DEL\s+PRODUCTO\b/,1]];
-const PL_SERIE=[[/\bSERIAL\s*(?:NO|NUMBER|N[O°º]|#)?\b\.?|\bS\s*\/\s*N\b|\bS\.\s*N\.|\bSN\b|序號|序号|\bN[O°º]?\s*(?:DE\s*)?SERIE\b|\bSERIE\b/,4]];
-/* Etiquetas que NO son modelo ni serie: su valor nunca se toma (número de parte, regulatorio, versión, SNID, UPC…). */
-const PL_OTRA=/REGULATORY|\bREG\.?\s*MODEL|PRODUCT\s*(?:NUMBER|NO\b|#)|\bPART\b|\bP\s*\/\s*N\b|料號|料号|\bVERSION\b|\bREV\b|\bRATING\b|\bPOWER\b|\bINPUT\b|\bDATE\b|\bMFG\b|\bMFD\b|MANUFACTURED|\bUPC\b|\bEAN\b|\bSNID\b|ASSEMBLY|SPARES|\bCT\b|\bPPID\b|\bCAUTION\b|\bMADE IN\b|\bTYPE\b/;
-const PL_STOP=/^(NO|NUMBER|MODEL|MODELO|SERIAL|SERIE|NAME|PRODUCT|PART|REV|VERSION|TYPE|DATE|RATING|MADE|IN|CHINA|LCD|MONITOR|LISTED|CLASS)$/;
-const PL_LBL=/(\bNO\b\.?|NUMBER|RATING|TYPE|DATE|VERSION|NAME|MODEL|SERIAL|PART|\bREV\b|MANUFACTURED|ASSEMBLY|SPARES|MFG|\bS\/N\b|\bP\/N\b|\bSNID\b|\bUPC\b)|:\s*$/i;
-const plEsLbl=u=>PL_OTRA.test(u)||PL_MODELO.some(([r])=>r.test(u))||PL_SERIE.some(([r])=>r.test(u));
-const plTok=s=>{ for(let t of String(s).split(/[\s:：|]+|\/(?=\s)|(?<=\s)\//)){ t=t.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g,''); if(/^[A-Za-z0-9][A-Za-z0-9.\-\/]{1,29}$/.test(t)&&/\d/.test(t)&&!PL_STOP.test(t.toUpperCase())&&!/^\d{1,3}(HZ|V|A|W)?$/i.test(t)&&!/\d+-\d+V/i.test(t)&&!/\d(HZ|VAC|VDC|V~?|MA|KG|MM)$/i.test(t)&&!/^\d+\/\d+/.test(t)&&!/^(19|20)\d\d$/.test(t)) return t; } return ''; };
-/** Valor de una etiqueta: en la misma línea; si no, en la línea que le toca del bloque de valores (tablas leídas por columnas) o en la siguiente línea que sea solo valor (nunca en la de otra etiqueta). */
-function plValor(L, U, labels, okTok){
+const PL_SERIE=[[/\bSERIAL\s*(?:NO|NUMBER|N[O°º]|#)?\b\.?|\bSERIAL\s*#|\bSER\.?\s*(?:NO\b\.?|#)|\bS\s*\/\s*N\b|\bN\s*\/\s*S\b|\bS\.\s*N\.|\bSN\b|\bS\s*#|序號|序号|\bN[O°º]?\.?\s*(?:DE\s*)?SERIE\b|\bSERIE\b/,4]];
+/* Etiquetas que NO son marca, modelo ni serie: su valor nunca se toma (número de parte, regulatorio, versión, SNID, UPC…). */
+const PL_OTRA=/REGULATORY|\bREG\.?\s*MODEL|PRODUCT\s*(?:NUMBER|NO\b|#)|\bPROD\.?\s*NO\b|\bPART\b|\bP\s*\/\s*N\b|料號|料号|\bVERSION\b|\bREV\b|\bRATING\b|\bPOWER\b|\bINPUT\b|\bOUTPUT\b|\bVOLTAJE\b|\bPOTENCIA\b|\bDATE\b|\bMFG\b|\bMFD\b|MANUFACTURED|\bFECHA\b|\bUPC\b|\bEAN\b|\bSNID\b|ASSEMBLY|SPARES|\bCT\b|\bPPID\b|\bCAUTION\b|\bMADE IN\b|HECHO EN|\bTYPE\b|\bIMPORTADOR\b|\bEXPORTADOR\b/;
+const PL_CORTE=/\s(?=(?:MODEL|MODELO|MARCA|BRAND|VERSION|REV|PART|P\/N|POWER|RATING|DATE|MFG|SNID|UPC|SERIAL|SERIE|S\/N|MADE|HECHO|INPUT|AC|DC|VOLTAJE|POTENCIA|PROD|PRODUCT|TYPE|CLASS)\b)/i;
+const PL_STOP=/^(NO|NUMBER|MODEL|MODELO|SERIAL|SERIE|NAME|PRODUCT|PART|REV|VERSION|TYPE|DATE|RATING|MADE|IN|CHINA|LCD|MONITOR|LISTED|CLASS|MARCA|BRAND)$/;
+const PL_LBL=/(\bNO\b\.?|NUMBER|RATING|TYPE|DATE|VERSION|NAME|MODEL|MODELO|MARCA|SERIAL|SERIE|PART|\bREV\b|MANUFACTURED|ASSEMBLY|SPARES|MFG|\bS\/N\b|\bP\/N\b|\bSNID\b|\bUPC\b)|:\s*$/i;
+const plEsLbl=u=>PL_OTRA.test(u)||[PL_MARCA,PL_MODELO,PL_SERIE].some(L=>L.some(([r])=>r.test(u)));
+const plLimpia=t=>String(t||'').replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9)]+$/g,'');
+const plMalo=t=>PL_STOP.test(t.toUpperCase())||/^\d{1,3}(HZ|V|A|W)?$/i.test(t)||/\d+-\d+V/i.test(t)||/^[\d.,+\/-]+(HZ|VAC|VDC|V~?|MA|A|KG|MM|VA|W|WATTS?|VOLTS?)$/i.test(t)||/^\d+\/\d+/.test(t)||/^(19|20)\d\d$/.test(t);
+/** Primer código (letras/números) del texto: sirve para serie. */
+const plTok=s=>{ for(let t of String(s).split(/[\s:：|]+|\/(?=\s)|(?<=\s)\//)){ t=plLimpia(t); if(/^[A-Za-z0-9][A-Za-z0-9.\-\/]{1,29}$/.test(t)&&/\d/.test(t)&&!plMalo(t)) return t; } return ''; };
+/** Frase completa del valor (hasta 4 palabras, hasta la siguiente etiqueta): sirve para modelo ("CENTRA PLUS 1000", "ThinkVision T2224d"). */
+const plFrase=s=>{ const seg=String(s).replace(/^[\s:：.#\-–]+/,'').split(PL_CORTE)[0].split(/\s{2,}|[|;,]/)[0]; const w=seg.split(/\s+/).map(plLimpia).filter(Boolean).slice(0,4);
+  while(w.length>1 && /^[A-Za-z]{4,}$/.test(w[w.length-1])) w.pop(); const f=w.join(' '); return w.some(x=>/\d/.test(x)&&!plMalo(x))&&f.length<=30?f:''; };
+const plTexto=s=>{ const seg=String(s).replace(/^[\s:：.#\-–]+/,'').split(PL_CORTE)[0].split(/\s{2,}|[|;,]/)[0].trim(); return /^[A-Za-z][A-Za-z0-9 &.\-]{1,24}$/.test(seg)?seg:''; };
+/** Valor de una etiqueta: en la misma línea; si no, en la línea que le toca del bloque de valores (tablas leídas por columnas) o en las 3 líneas siguientes que sean solo valor (nunca en la de otra etiqueta). */
+function plValor(L, U, labels, sacar, okTok){
   let best=null;
   labels.forEach(([re,w])=>{ for(let i=0;i<U.length;i++){
     const m=U[i].match(re); if(!m) continue;
-    const pre=U[i].slice(0,m.index); if(PL_OTRA.test(pre+m[0]) && !/\bHP\s+MODEL\b/.test(m[0])) continue;
-    const cand=[], resto=L[i].slice((m.index||0)+m[0].length), seg=resto.split(/\s{2,}|\s(?=(?:VERSION|REV|PART|P\/N|POWER|RATING|DATE|MFG|SNID|UPC|SERIAL|S\/N)\b)/i)[0];
-    cand.push(plTok(seg));
+    if(PL_OTRA.test(U[i].slice(0,m.index)+m[0]) && !/\bHP\s+MODEL\b/.test(m[0])) continue;
+    const cand=[sacar(L[i].slice((m.index||0)+m[0].length))];
     let s=i; while(s>0 && !plTok(L[s-1]) && PL_LBL.test(L[s-1]) && L[s-1].length<40) s--;
     let e=i+1; while(e<L.length && !plTok(L[e]) && PL_LBL.test(L[e]) && L[e].length<40) e++;
-    if(e>i+1 || s<i){ const c=L[e+(i-s)]; if(c) cand.push(plTok(c)); }
-    for(let j=i+1;j<=i+2&&j<L.length;j++){ if(plEsLbl(U[j])) break; cand.push(plTok(L[j])); }
+    if(e>i+1 || s<i){ const c=L[e+(i-s)]; if(c) cand.push(sacar(c)); }
+    for(let j=i+1;j<=i+3&&j<L.length;j++){ if(plEsLbl(U[j])) break; cand.push(sacar(L[j])); }
     const v=cand.find(x=>x&&okTok(x)); if(v && (!best || w>best.w)) best={v,w,i};
     if(v) break;
   }});
   return best?best.v:'';
 }
+const plTitulo=s=>s.length<=4&&s===s.toUpperCase()?s:s.toLowerCase().replace(/(^|[\s-])\S/g,c=>c.toUpperCase());
 function parsePlaca(texto, barras){
   const L=String(texto||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean), U=L.map(l=>norm(l)), T=U.join('\n');
+  // marca: primero la etiqueta "Marca:/Brand:", si no, la marca conocida que más aparece
   let marca='', best=0;
-  MARCAS.forEach(([n,re])=>{ const g=new RegExp(re.source,'g'), dom=new RegExp('WWW\\.'+n.toUpperCase().replace(/[^A-Z]/g,'')+'\\.','g'); const c=(T.match(g)||[]).length+2*(T.match(dom)||[]).length; if(c>best){ best=c; marca=n; } });
-  let serie=plValor(L,U,PL_SERIE,v=>v.length>=6).toUpperCase(), deBarras=false;
-  const bc=[...new Set((barras||[]).map(b=>String(b).trim().toUpperCase()))].filter(b=>/^[A-Z0-9\-]{6,30}$/.test(b) && !/^\d{11,14}$/.test(b) && !/^\d{5}-\d{4}-\d{1,4}$/.test(b));
-  if(serie){ const s0=serie.replace(/[^A-Z0-9]/g,''); const h=bc.find(b=>{ const b0=b.replace(/[^A-Z0-9]/g,''); return b0===s0 || (s0.length>=6&&(b0.includes(s0)||s0.includes(b0))) || plDist(b0,s0)<=2; }); if(h){ serie=h; deBarras=true; } }
+  const ml=plValor(L,U,PL_MARCA,plTexto,v=>!plMalo(v));
+  MARCAS.forEach(([n,re])=>{ const g=new RegExp(re.source,'g'), dom=new RegExp('WWW\\.'+n.toUpperCase().replace(/[^A-Z]/g,'')+'\\.','g'); const c=(T.match(g)||[]).length+2*(T.match(dom)||[]).length+(ml&&re.test(norm(ml))?5:0); if(c>best){ best=c; marca=n; } });
+  if(ml && !(marca && new RegExp(MARCAS.find(x=>x[0]===marca)[1].source).test(norm(ml)))) marca=plTitulo(ml);
+  let serie=plValor(L,U,PL_SERIE,plTok,v=>v.length>=6).toUpperCase(), deBarras=false;
+  const bc=[...new Set((barras||[]).map(b=>String(b).trim().toUpperCase().replace(/^\*|\*$/g,'')))].filter(b=>/^[A-Z0-9\-]{6,30}$/.test(b) && !/^\d{11,14}$/.test(b) && !/^\d{5}-\d{4}-\d{1,4}$/.test(b));
+  if(serie){ const s0=serie.replace(/[^A-Z0-9]/g,''); const h=bc.find(b=>{ const b0=b.replace(/[^A-Z0-9]/g,''); return b0===s0 || (s0.length>=6&&(b0.includes(s0)||s0.includes(b0))) || plDist(b0,s0)<=2; }); if(h){ if(h.replace(/[^A-Z0-9]/g,'').length>=s0.length) serie=h; deBarras=true; } }
   else if(bc.length===1){ serie=bc[0]; deBarras=true; }
   if(!serie){ const d=T.match(/\b[A-Z]{2}-?0[A-Z0-9]{5}-?[A-Z0-9]{5}-?[A-Z0-9]{3}-?[A-Z0-9]{4}\b/); if(d) serie=d[0]; }
   const s0=serie.replace(/[^A-Z0-9]/g,'');
-  const modelo=plValor(L,U,PL_MODELO,v=>(/[A-Za-z]/.test(v)||v.length>=4) && v.length<=20 && v.toUpperCase().replace(/[^A-Z0-9]/g,'')!==s0 && !/^[A-Z0-9]{1,4}\.[A-Z0-9]{3,}\.[A-Z0-9]{2,}$/i.test(v));
-  const hits=[/MODEL|モデル|型號|型号/,/SERIAL|S\s*\/\s*N|序號|序号|SERIE/,/RATING|POWER|INPUT/,/MADE IN|DATE|MFG|MFD|MANUFACTURED/].filter(r=>r.test(T)).length;
+  let modelo=plValor(L,U,PL_MODELO,plFrase,v=>(/[A-Za-z]/.test(v)||v.length>=4) && v.toUpperCase().replace(/[^A-Z0-9]/g,'')!==s0 && !/^[A-Z0-9]{1,4}\.[A-Z0-9]{3,}\.[A-Z0-9]{2,}$/i.test(v));
+  if(modelo && marca){ const w=modelo.split(' '); if(w.length>1 && norm(w[0])===norm(marca)) modelo=w.slice(1).join(' '); }
+  const hits=[/MODEL|モデル|型號|型号/,/SERIAL|S\s*\/\s*N|序號|序号|SERIE|S\s*#/,/RATING|POWER|INPUT|VOLTAJE|POTENCIA/,/MADE IN|DATE|MFG|MFD|MANUFACTURED|MARCA|BRAND/].filter(r=>r.test(T)).length;
   return { marca, modelo, serie, deBarras, hits, score:(marca?1:0)+(modelo?1:0)+(serie?2:0)+(deBarras?1:0)+hits*.5 };
 }
 /** Une las lecturas de las 3 orientaciones: la mejor manda y las otras solo completan lo que le falte. */
@@ -409,15 +426,15 @@ async function leerBarras(file){
     if(!('BarcodeDetector' in window)) return [];
     const sup=await BarcodeDetector.getSupportedFormats(), want=['code_128','code_39','code_93','codabar','itf','ean_13','ean_8','upc_a','upc_e','qr_code','data_matrix','pdf417'].filter(x=>sup.includes(x));
     if(!want.length) return [];
-    const bmp=await createImageBitmap(file);
-    return (await new BarcodeDetector({formats:want}).detect(bmp)).map(b=>b.rawValue).filter(Boolean);
+    const bmp=await bitmapReducido(file,2000);
+    try{ return (await new BarcodeDetector({formats:want}).detect(bmp)).map(b=>b.rawValue).filter(Boolean); } finally { if(bmp.close) bmp.close(); }
   }catch(e){ return []; }
 }
 /** Prepara la foto para el lector: gris, contraste estirado y 1400 px máx. (sube ~3 veces menos que la foto normal); devuelve 0°, 90° y 270°. */
 async function prepOcr(dataUrl){
   const bmp=await createImageBitmap(await (await fetch(dataUrl)).blob()), k=Math.min(1,1400/Math.max(bmp.width,bmp.height));
   const w=Math.round(bmp.width*k), h=Math.round(bmp.height*k), c=document.createElement('canvas'); c.width=w; c.height=h;
-  const x=c.getContext('2d'); x.drawImage(bmp,0,0,w,h);
+  const x=c.getContext('2d'); x.drawImage(bmp,0,0,w,h); if(bmp.close) bmp.close();
   try{
     const im=x.getImageData(0,0,w,h), d=im.data, hist=new Uint32Array(256);
     for(let i=0;i<d.length;i+=4){ const g=(d[i]*77+d[i+1]*150+d[i+2]*29)>>8; d[i]=g; hist[g]++; }
@@ -426,8 +443,8 @@ async function prepOcr(dataUrl){
     x.putImageData(im,0,0);
   }catch(e){}
   const out=[c.toDataURL('image/jpeg',.72)];
-  for(const deg of [90,270]){ const r=document.createElement('canvas'); r.width=h; r.height=w; const y=r.getContext('2d'); y.translate(h/2,w/2); y.rotate(deg*Math.PI/180); y.drawImage(c,-w/2,-h/2); out.push(r.toDataURL('image/jpeg',.72)); }
-  return out;
+  for(const deg of [90,270]){ const r=document.createElement('canvas'); r.width=h; r.height=w; const y=r.getContext('2d'); y.translate(h/2,w/2); y.rotate(deg*Math.PI/180); y.drawImage(c,-w/2,-h/2); out.push(r.toDataURL('image/jpeg',.72)); r.width=r.height=0; }
+  c.width=c.height=0; return out;
 }
 function ocrMsg(cls, html){ const b=$('#ocrBox'); if(!html){ b.hidden=true; b.innerHTML=''; return; } b.className='status '+cls; b.innerHTML='<span>'+html+'</span>'; b.hidden=false; }
 function ocrLimpiar(sel){ (sel?[sel]:OCRF.map(f=>f[1])).forEach(s=>{ const el=$(s); el.classList.remove('ocr-fill'); const t=el.closest('label').querySelector('.tagf'); if(t) t.remove(); if(sel) OCRUNDO=OCRUNDO.filter(x=>x!==s); }); }
