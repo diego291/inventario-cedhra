@@ -89,6 +89,7 @@ var Motor = (function () {
     function nGroup(n) { return byN[U(n)] || []; }
     function maxCorrel(n) { var g = nGroup(n), m = 0; g.forEach(function (o) { if (o.correl > m) m = o.correl; }); return g.length ? m : 0; }
     var consSet = {}; (input.consBlq || []).forEach(function (b) { if (S(b) !== '') consSet[U(b)] = 1; });
+    var npSet = {}; (input.np || []).forEach(function (p) { if (S(p[0]) !== '' && S(p[1]) !== '') npSet[U(trim(p[0])) + '|' + U(p[1])] = 1; });   // (extensión de la app) "Numerar primero": ubicación|bloque
     var rcMap = {}; (input.rc || []).forEach(function (p) { if (S(p[0]) !== '' && !(U(p[0]) in rcMap)) rcMap[U(p[0])] = S(p[1]); });
     var consDesde = S(cfg.consDesde).slice(0, 10), consSerie = S(cfg.consSerie) === 'Sí';
     inv.forEach(function (o) {
@@ -160,7 +161,7 @@ var Motor = (function () {
       r.AI = r.AJ >= 0 ? 0 : r.AF;
       if (r.blank) r.AG = null;
       else {
-        var li = locIdx[U(r.C)] || 9999, xv = /^\s*\d+(\.\d+)?\s*$/.test(r.X) ? Number(r.X) : 9999;
+        var li = npSet[U(trim(r.C)) + '|' + U(r.X)] ? 0 : (locIdx[U(r.C)] || 9999), xv = /^\s*\d+(\.\d+)?\s*$/.test(r.X) ? Number(r.X) : 9999;
         r.AG = li * 100000000 + xv * 10000 + r.ROW;
       }
       r.Y = r.blank ? '' : r.C + '|' + r.X;
@@ -494,7 +495,7 @@ var Motor = (function () {
       };
     });
     var ubic = lista.map(function (l) { return { n: trim(l.n), tipo: S(l.t), edif: S(l.z), resp: S(l.r), activa: (l.a === false || l.a === 'No') ? 'No' : 'Sí' }; });
-    return { cfg: base.cfg || {}, ubic: ubic, consBlq: base.consBlq || [], rc: base.rc || [], cat: base.cat || [], rubros: base.rubros || [], eq: base.eq || [], inv: (base.inv || []).concat((base.extra || []).map(function (x) {
+    return { cfg: base.cfg || {}, ubic: ubic, consBlq: base.consBlq || [], rc: base.rc || [], np: base.np || [], cat: base.cat || [], rubros: base.rubros || [], eq: base.eq || [], inv: (base.inv || []).concat((base.extra || []).map(function (x) {
       var c = S(x.code).toUpperCase();
       return { code: c, inst: c.slice(0, 5), blk: c.slice(6, 10), correl: Nn(c.slice(11)), desc: catD[c.slice(6, 10)] || '', marca: '', modelo: '', serie: S(x.serie),
         fecha: S(x.fecha).slice(0, 10), valor: Nn(x.valor), calidad: '', asig: S(x.ubic), manual: 'Sí', reqU: S(x.ubic), extra: true };

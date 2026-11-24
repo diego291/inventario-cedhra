@@ -1,7 +1,7 @@
 /* ===================== CONFIGURACIÓN ===================== */
-const CFG_TABS = { importar: 'Importar del Excel v10', general: 'General', reglas: 'Reglas de códigos', extracod: 'Códigos después del corte', familia: 'Corrección de familia', eq: 'Equivalencias', textos: 'Textos del acta', sistema: 'Sistema' };
+const CFG_TABS = { importar: 'Importar del Excel v10', general: 'General', reglas: 'Reglas de códigos', extracod: 'Códigos después del corte', familia: 'Familia y numerar primero', eq: 'Equivalencias', textos: 'Textos del acta', sistema: 'Sistema' };
 let SYS = null;
-let IMP = null, EQED = null, RCED = null, EXF = { code: '', ubic: '', fecha: '', valor: '', serie: '', obs: '' }, EXI = -1;
+let IMP = null, EQED = null, RCED = null, NPED = null, EXF = { code: '', ubic: '', fecha: '', valor: '', serie: '', obs: '' }, EXI = -1;
 MODS.config = {
   html() {
     const k = UI.cfg, ro = !isAdmin();
@@ -95,7 +95,16 @@ MODS.config = {
     if (!RCED) RCED = (BASE.rc || []).map(p => [p[0], p[1], '']);
     return `<div class="card cfgsec"><h2>Corrección de familia</h2><p class="hint" style="margin:0">Bienes registrados en el sistema en una familia equivocada (ej.: UPS registrados como 6118 Regulador). <b>Todos</b> los códigos de la familia equivocada se descargan, y los bienes encontrados se cargan en la familia correcta con la misma fecha, valor, marca y serie, en orden cronológico.</p>
       <div class="pairs">${RCED.map((p, i) => `<div><input type="text" class="mono" data-rc="0" data-i="${i}" value="${esc(p[0])}" placeholder="Bloque equivocado" style="width:150px">→<input type="text" class="mono" data-rc="1" data-i="${i}" value="${esc(p[1])}" placeholder="Bloque correcto" style="width:150px"><span class="hint">${esc(R.catDesc(p[0]) || '')} → ${esc(R.catDesc(p[1]) || '')}</span><button class="btn sm ghost bad" data-act="rcDel" data-i="${i}" type="button">✕</button></div>`).join('')}</div>
-      <div class="row"><button class="btn sm" data-act="rcAdd" type="button">+ Agregar corrección</button><button class="btn pri" data-act="reglasSave" data-which="rc" type="button">Guardar</button></div></div>`;
+      <div class="row"><button class="btn sm" data-act="rcAdd" type="button">+ Agregar corrección</button><button class="btn pri" data-act="reglasSave" data-which="rc" type="button">Guardar</button></div></div>
+      ${this.numerar()}`;
+  },
+  numerar() {
+    if (!NPED) NPED = (BASE.np || []).map(p => [p[0], p[1]]);
+    const opts = v => `<option value="">— ubicación —</option>` + D.locs.map(l => `<option value="${esc(l.n)}"${norm(v) === norm(l.n) ? ' selected' : ''}>${esc(l.n)}</option>`).join('');
+    const nuevos = (u, b) => (R.cod || []).filter(c => U(c.E) === U(u) && c.D === b && c.R !== 'Conservado').length;
+    return `<div class="card cfgsec"><h2>Numerar primero</h2><p class="hint" style="margin:0">Los bienes <b>sin código conservado</b> de esa familia en esa ubicación reciben los primeros códigos reciclados o nuevos de la familia, antes que las demás ubicaciones. Solo se corren los códigos de esa familia; las demás no cambian. Ej.: Sala de reuniones · 1158 → su silla sin código toma la 11674-1158-0061.</p>
+      <div class="pairs">${NPED.map((p, i) => `<div><select data-np="0" data-i="${i}" style="width:220px">${opts(p[0])}</select>·<input type="text" class="mono" data-np="1" data-i="${i}" value="${esc(p[1])}" placeholder="Bloque" maxlength="4" style="width:90px"><span class="hint">${esc(R.catDesc(p[1]) || '')}${p[0] && /^\d{4}$/.test(p[1]) ? ' · ' + nuevos(p[0], p[1]) + ' sin código conservado' : ''}</span><button class="btn sm ghost" data-act="npDel" data-i="${i}" type="button" title="Quitar">✕</button></div>`).join('') || '<div class="hint">Sin reglas.</div>'}</div>
+      <div class="row"><button class="btn sm" data-act="npAdd" type="button">+ Agregar</button><button class="btn pri" data-act="reglasSave" data-which="np" type="button">Guardar</button></div></div>`;
   },
   ubic() {
     return `<div class="card"><h2>Ubicaciones y responsables <span class="meta">el orden de esta lista es el orden de numeración (las nuevas van al final)</span></h2>
@@ -132,9 +141,12 @@ ACT.cfgSave = async b => {
 ACT.reglasSave = async b => {
   const cons = b.dataset.which === 'cons' ? $('#consBlqTxt').value.split(/\n|,/).map(s => s.trim()).filter(Boolean) : BASE.consBlq;
   const rc = b.dataset.which === 'rc' ? RCED.filter(p => p[0] || p[1]) : BASE.rc;
-  b.disabled = true; try { await api('api_g_setReglas', { consBlq: cons, rc }); RCED = null; await load(); render(); toast('Reglas guardadas y códigos recalculados'); } catch (e) { toast(errMsg(e), true); b.disabled = false; }
+  const np = b.dataset.which === 'np' ? NPED.filter(p => p[0] || p[1]) : (BASE.np || []);
+  b.disabled = true; try { await api('api_g_setReglas', { consBlq: cons, rc, np }); RCED = null; NPED = null; await load(); render(); toast('Reglas guardadas y códigos recalculados'); } catch (e) { toast(errMsg(e), true); b.disabled = false; }
 };
 ACT.rcAdd = () => { RCED.push(['', '', '']); render(); };
+ACT.npAdd = () => { NPED.push(['', '']); render(); };
+ACT.npDel = b => { NPED.splice(+b.dataset.i, 1); render(); };
 ACT.rcDel = b => { RCED.splice(+b.dataset.i, 1); render(); };
 ACT.eqAdd = () => { EQED.push(['', '']); render(); };
 ACT.eqDel = b => { EQED.splice(+b.dataset.i, 1); render(); };
@@ -144,6 +156,7 @@ ACT.txtSave = async b => { const m = {}; $$('[data-txt]').forEach(t => m[t.datas
 $('#main').addEventListener('input', e => {
   const t = e.target;
   if (t.dataset.rc != null) RCED[+t.dataset.i][+t.dataset.rc] = t.value.trim();
+  if (t.dataset.np != null) NPED[+t.dataset.i][+t.dataset.np] = t.value.trim();
   if (t.dataset.eq != null) EQED[+t.dataset.i][+t.dataset.eq] = t.value;
 });
 $('#main').addEventListener('change', async e => {

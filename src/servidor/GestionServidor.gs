@@ -110,11 +110,12 @@ function gBase_() {
   var cfg = {};
   gRows_(GS.CFG).forEach(function (r) { var k = str_(r[0]).trim(); if (k) cfg[k] = d10_(r[1]); });
   cfg.otrasInst = String(cfg.otrasInst || '').split(/[,;\s]+/).filter(String);
-  var consBlq = [], rc = [];
+  var consBlq = [], rc = [], np = [];
   gRows_(GS.REG).forEach(function (r) {
     var t = norm_(r[0]);
     if (t === 'CONSERVAR BLOQUE' && str_(r[1]).trim()) consBlq.push(blkOrKey_(r[1]));
     if (t === 'CORREGIR FAMILIA' && str_(r[1]).trim() && str_(r[2]).trim()) rc.push([blk_(r[1]), blk_(r[2])]);
+    if (t === 'NUMERAR PRIMERO' && str_(r[1]).trim() && str_(r[2]).trim()) np.push([str_(r[1]).trim(), blk_(r[2])]);
   });
   var cat = gRows_(GS.CAT).map(function (r) { return { c: blk_(r[0]), manual: str_(r[1]), inst: str_(r[2]), usar: str_(r[3]), origen: str_(r[4]), descInv: str_(r[5]) }; });
   while (cat.length && !cat[cat.length - 1].c) cat.pop();
@@ -127,7 +128,7 @@ function gBase_() {
   var extra = gRows_(GS.EXT).filter(function (r) { return str_(r[0]).trim(); }).map(function (r) {
     return { code: str_(r[0]).trim().toUpperCase(), ubic: str_(r[1]).trim(), fecha: d10_(r[2]), valor: Number(r[3]) || 0, serie: str_(r[4]).trim(), obs: str_(r[5]), por: str_(r[6]), t: d10_(r[7]) };
   });
-  b = { cfg: cfg, consBlq: consBlq, rc: rc, cat: cat, rubros: rubros, eq: eq, inv: inv, extra: extra };
+  b = { cfg: cfg, consBlq: consBlq, rc: rc, np: np, cat: cat, rubros: rubros, eq: eq, inv: inv, extra: extra };
   cachePutBig_(key, b);
   return b;
 }
@@ -184,6 +185,7 @@ function api_g_import(tok, d) {
     var reglas = [];
     (d.consBlq || []).forEach(function (b) { if (str_(b).trim()) reglas.push(['Conservar bloque', str_(b).trim(), '', 'Importado del Excel']); });
     (d.rc || []).forEach(function (p) { if (str_(p[0]).trim() && str_(p[1]).trim()) reglas.push(['Corregir familia', blk_(p[0]), blk_(p[1]), 'Importado del Excel']); });
+    gNumerarPrimero_().forEach(function (p) { reglas.push(['Numerar primero', p[0], p[1], '']); });   // no vienen del Excel: se mantienen
     gWrite_(GS.REG, reglas);
     var T = ['@', '@', '@', '@', '@', '@'];
     gWrite_(GS.CAT, d.cat.map(function (x) { return [str_(x.c), str_(x.manual), str_(x.inst), str_(x.usar), str_(x.origen), str_(x.descInv)]; }), T);
@@ -221,12 +223,21 @@ function api_g_setCfg(tok, patch) {
     return { ok: true };
   });
 }
+/** Reglas "Numerar primero" guardadas (ubicación, bloque): sus bienes nuevos se numeran antes que los de las demás ubicaciones. */
+function gNumerarPrimero_() {
+  var out = [];
+  gRows_(GS.REG).forEach(function (r) { if (norm_(r[0]) === 'NUMERAR PRIMERO' && str_(r[1]).trim() && str_(r[2]).trim()) out.push([str_(r[1]).trim(), blk_(r[2])]); });
+  return out;
+}
 function api_g_setReglas(tok, o) {
   var u = auth_(tok, 'Administrador');
   return withLock_(function () {
     var out = [];
     (o.consBlq || []).forEach(function (b) { var s = String(b || '').trim(); if (!s) return; if (!/^(\d{4}|\d{5}-\d{4})$/.test(blkOrKey_(s))) throw valErr_('Bloque a conservar no válido: ' + s + ' (use 1103 o 11674-1103).'); out.push(['Conservar bloque', blkOrKey_(s), '', '']); });
     (o.rc || []).forEach(function (p) { var a = blk_(p[0]), b = blk_(p[1]); if (!a && !b) return; if (!/^\d{4}$/.test(a) || !/^\d{4}$/.test(b)) throw valErr_('Corrección de familia no válida: ' + a + ' → ' + b); if (a === b) throw valErr_('La familia equivocada y la correcta no pueden ser iguales (' + a + ').'); out.push(['Corregir familia', a, b, String(p[2] || '')]); });
+    var np = o.np;
+    if (!np) np = gNumerarPrimero_();
+    np.forEach(function (p) { var ub = String(p[0] || '').trim(), b = blk_(p[1]); if (!ub && !b) return; if (!ub || !/^\d{4}$/.test(b)) throw valErr_('Numerar primero no válido: ' + (ub || '(sin ubicación)') + ' · ' + (b || '(sin bloque)') + '. Elija la ubicación y escriba el bloque de 4 dígitos.'); out.push(['Numerar primero', ub, b, '']); });
     gWrite_(GS.REG, out);
     log_(u, 'Gestión: reglas de códigos', '', out.map(function (r) { return r[0] + ' ' + r[1] + (r[2] ? '→' + r[2] : ''); }).join(' | '), u.dev);
     gBump_();
