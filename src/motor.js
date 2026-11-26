@@ -89,6 +89,8 @@ var Motor = (function () {
     function nGroup(n) { return byN[U(n)] || []; }
     function maxCorrel(n) { var g = nGroup(n), m = 0; g.forEach(function (o) { if (o.correl > m) m = o.correl; }); return g.length ? m : 0; }
     var consSet = {}; (input.consBlq || []).forEach(function (b) { if (S(b) !== '') consSet[U(b)] = 1; });
+    var no99 = !!input.no99;   // (extensión de la app) bloques "99 Otros no incluidos" no reciclan solos: sus códigos se asignan solo si el bien trae "Etiqueta que tiene"
+    function esNo99(x) { return no99 && /99$/.test(S(x).trim()); }
     var npSet = {}; (input.np || []).forEach(function (p) { if (S(p[0]) !== '' && S(p[1]) !== '') npSet[U(trim(p[0])) + '|' + U(p[1])] = 1; });   // (extensión de la app) "Numerar primero": ubicación|bloque
     var rcMap = {}; (input.rc || []).forEach(function (p) { if (S(p[0]) !== '' && !(U(p[0]) in rcMap)) rcMap[U(p[0])] = S(p[1]); });
     var consDesde = S(cfg.consDesde).slice(0, 10), consSerie = S(cfg.consSerie) === 'Sí';
@@ -191,8 +193,9 @@ var Motor = (function () {
     var abIdx = {}, freeCount = {};
     Object.keys(byN).forEach(function (k) {
       var g = byN[k];
-      var free = g.filter(function (o) { return o.Z === 0; });
+      var free = esNo99(g[0] && g[0].blk) ? [] : g.filter(function (o) { return o.Z === 0; });
       g.forEach(function (o) {
+        if (esNo99(o.blk) && o.Z !== 1) { o.AA = ''; return; }
         if (o.Z === 1) { o.AA = ''; return; }
         var c = 0; free.forEach(function (f) { if (f.P <= o.P) c++; }); o.AA = c;
         abIdx[U(o.N) + '|' + c] = abIdx[U(o.N) + '|' + c] === undefined ? o.i : abIdx[U(o.N) + '|' + c];
@@ -208,7 +211,7 @@ var Motor = (function () {
     rows.forEach(function (r) {
       if (r.blank) { r.G = ''; r.H = ''; r.M = ''; r.N = ''; r.O = ''; r.AA = ''; r.AC = ''; r.T = ''; return; }
       var n = r.W + '-' + r.X;
-      r.AA = r.Z === '' ? '' : countN(n) - countNz1(n);
+      r.AA = r.Z === '' ? '' : (esNo99(r.X) ? 0 : countN(n) - countNz1(n));
       r.AC = r.Z === '' ? '' : maxCorrel(n);
       // G descripción
       if (r.AR) { var dx = catDesc(r.X), da = catDesc(r.AN); r.G = '↺ ' + (dx === null ? '?' : dx) + ' · tenía etiqueta de ' + (da === null ? r.AN : da) + ': reetiquetar'; }
@@ -495,7 +498,7 @@ var Motor = (function () {
       };
     });
     var ubic = lista.map(function (l) { return { n: trim(l.n), tipo: S(l.t), edif: S(l.z), resp: S(l.r), activa: (l.a === false || l.a === 'No') ? 'No' : 'Sí' }; });
-    return { cfg: base.cfg || {}, ubic: ubic, consBlq: base.consBlq || [], rc: base.rc || [], np: base.np || [], cat: base.cat || [], rubros: base.rubros || [], eq: base.eq || [], inv: (base.inv || []).concat((base.extra || []).map(function (x) {
+    return { cfg: base.cfg || {}, ubic: ubic, consBlq: base.consBlq || [], rc: base.rc || [], np: base.np || [], no99: S((base.cfg || {}).reciclar99) !== 'Sí', cat: base.cat || [], rubros: base.rubros || [], eq: base.eq || [], inv: (base.inv || []).concat((base.extra || []).map(function (x) {
       var c = S(x.code).toUpperCase();
       return { code: c, inst: c.slice(0, 5), blk: c.slice(6, 10), correl: Nn(c.slice(11)), desc: catD[c.slice(6, 10)] || '', marca: '', modelo: '', serie: S(x.serie),
         fecha: S(x.fecha).slice(0, 10), valor: Nn(x.valor), calidad: '', asig: S(x.ubic), manual: 'Sí', reqU: S(x.ubic), extra: true };
