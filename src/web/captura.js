@@ -101,6 +101,7 @@ function loadRef(R){
   });
   serCount.forEach((n,k)=>{ if(n>1) SER.set(k,'DUP'); });
   INVLIST.forEach(l=>l.sort((a,b)=>a.code<b.code?-1:a.code>b.code?1:0));
+  SGIDX=[]; [...INVLIST.keys()].sort().forEach(b=>INVLIST.get(b).forEach(r=>{ const c=CAT.get(b); r.k=norm([r.code,r.desc,r.marca,r.modelo,r.serie,r.ub,c?c.r:''].join(' ')); SGIDX.push(r); }));
   $('#hdrInst').textContent = (REF.periodo||'Conteo físico') + ' · ' + (REF.nombre||'');
   if(R.me) setMe(R.me);
   $('#selInst').innerHTML = REF.insts.map((c,i)=>`<option value="${i?esc(c):''}">${esc(c)}${i?'':' (principal)'}</option>`).join('');
@@ -553,6 +554,7 @@ function oldRecHtml(r, u){
 }
 function dupEtq(e, exceptId){ const n=norm(e); if(!n) return []; return [...new Set(allRows().filter(r=>r.id!==exceptId&&norm(r.etq)===n).map(r=>r.ubic))]; }
 /* ---------- lista de la familia bajo "Etiqueta que tiene" ---------- */
+let SGIDX=[]; const SG={q:'',f:'todos'};
 const FAM={blk:'',q:'',f:'todos'};
 function famUsados(){
   const m=new Map();
@@ -1081,10 +1083,38 @@ function ping(){
 }
 
 /* ---------- pestañas y eventos ---------- */
+/* ---------- buscador de SIGES anterior: pestaña + hoja flotante ---------- */
+function sgBox(id){ return `<div class="sg-in"><input type="search" class="sg-q" data-sg="q" placeholder="Descripción, marca, modelo, serie, ubicación o código" autocomplete="off" value="${esc(SG.q)}"></div><div class="sg-ch" data-sg="chips"></div><div class="sg-cnt" data-sg="cnt"></div><div data-sg="list"></div>`; }
+function sgRender(){
+  if(!REF) return;
+  const ws=norm(SG.q).split(' ').filter(Boolean), used=famUsados();
+  const base=SGIDX.filter(r=>ws.every(w=>r.k.includes(w)));
+  const n99=base.filter(r=>r.blk.endsWith('99')), nUs=base.filter(r=>used.has(r.code));
+  const L0=SG.f==='n99'?n99:SG.f==='usados'?nUs:SG.f==='libres'?base.filter(r=>!used.has(r.code)):base;
+  const L=L0.slice(0,60);
+  const chips=[['todos','Todos',base.length],['n99','Solo bloques 99',n99.length],['libres','Libres',base.length-nUs.length],['usados','Usados',nUs.length]].map(([k,t,n])=>`<button type="button" data-sgf="${k}" class="${SG.f===k?'on':''}">${t}<i>${n}</i></button>`).join('');
+  const cnt=`${L0.length} código${L0.length===1?'':'s'} de ${SGIDX.length.toLocaleString('es')} en SIGES anterior`;
+  const list=L.length?L.map(r=>{ const u=used.get(r.code), is99=r.blk.endsWith('99');
+    return `<div class="sg-r${u!==undefined?' u':''}"><div class="t"><span class="cd">${esc(r.code)}</span><b>${famHl(r.desc.slice(0,120),ws)}</b><small>${is99?'<span class="sg-tg sg-99">Bloque 99</span>':''}${u!==undefined?`<span class="sg-tg sg-u">Usado · ${esc(u||'—')}</span>`:''}${famHl(r.marca,ws)} · ${famHl(r.modelo,ws)} · S/N ${famHl(r.serie,ws)}<br>${famHl(r.ub||'—',ws)}${r.valor?' · $'+esc(r.valor):''}${r.fecha?' · '+esc(String(r.fecha).slice(0,4)):''}</small></div>${u!==undefined?'':`<button type="button" class="sg-bt" data-sguse="${esc(r.code)}">Usar</button>`}</div>`; }).join('')+(L0.length>60?`<div class="fm-more">Mostrando 60 de ${L0.length}: escriba más para acotar.</div>`:'')
+    : '<div class="fm-more">Nada coincide. Pruebe con otra palabra, la marca o parte de la serie.</div>';
+  $$('.sg-wrap').forEach(w=>{ const q=w.querySelector('[data-sg=q]'); if(q&&q!==document.activeElement) q.value=SG.q;
+    w.querySelector('[data-sg=chips]').innerHTML=chips; w.querySelector('[data-sg=cnt]').textContent=cnt; w.querySelector('[data-sg=list]').innerHTML=list; });
+}
+function sgUse(code){
+  const r=INV.get(norm(code)); if(!r) return;
+  sgClose(); showTab('cap'); if(editingId) resetForm();
+  choose(CAT.get(r.blk)||{free:true,d:r.desc});
+  $('#inEtq').value=r.code; updEtq(); updSerie();
+  $('#inEtq').scrollIntoView({block:'center',behavior:'smooth'});
+  toast('Etiqueta '+r.code+' puesta'+($('#copyOld')?' · toque "Copiar marca, modelo y serie" si coincide':''));
+}
+function sgOpen(){ $('#sgSheet').hidden=false; $('#sgFab').hidden=true; sgRender(); setTimeout(()=>{ const q=$('#sgSheet .sg-q'); if(q) q.focus(); },60); }
+function sgClose(){ $('#sgSheet').hidden=true; sgFabShow(); }
+function sgFabShow(){ const f=$('#sgFab'); if(f) f.hidden=!(REF&&!$('#tab-cap').hidden&&$('#sgSheet').hidden); }
 function showTab(t){
   $$('nav.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));
-  ['cap','cat','refs','ficha','equipo','avance'].forEach(x=>$('#tab-'+x).hidden=x!==t);
-  LS.set('tab',t); renderAll();
+  ['cap','cat','sg','refs','ficha','equipo','avance'].forEach(x=>$('#tab-'+x).hidden=x!==t);
+  LS.set('tab',t); renderAll(); sgFabShow();
   if(t==='equipo') loadAdmin();
 }
 function renderAll(){
@@ -1092,6 +1122,7 @@ function renderAll(){
   renderLocInfo(); renderItems();
   if(!$('#tab-cat').hidden && !$('#catGrid').childElementCount) renderCat();
   if(!$('#tab-ficha').hidden) renderFicha();
+  if(!$('#tab-sg').hidden) sgRender();
   if(!$('#tab-refs').hidden) renderRefs();
   if(!$('#tab-avance').hidden) renderAvance();
   if(!$('#tab-equipo').hidden) renderEquipo();
@@ -1138,6 +1169,13 @@ function wire(){
   ib.onblur=()=>setTimeout(()=>{ sList=[]; renderSugg(); },180);
   $('#lsBien').onmousedown=e=>{ const li=e.target.closest('li'); if(!li||li.dataset.i===undefined) return; e.preventDefault(); pick(sList[+li.dataset.i]); };
   $('#goCat').onclick=()=>showTab('cat');
+  $('#sgTabBox').innerHTML=sgBox(); $('#sgSheetBox').innerHTML=sgBox(); $('#sgFab').onclick=sgOpen;
+  $('#sgSheet').addEventListener('click',e=>{ if(e.target.id==='sgSheet'||e.target.closest('#sgClose')) sgClose(); });
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&!$('#sgSheet').hidden) sgClose(); });
+  $$('.sg-wrap').forEach(w=>{
+    w.addEventListener('input',e=>{ if(e.target.dataset.sg==='q'){ SG.q=e.target.value; sgRender(); } });
+    w.addEventListener('click',e=>{ const f=e.target.closest('[data-sgf]'); if(f){ SG.f=f.dataset.sgf; sgRender(); return; } const u=e.target.closest('[data-sguse]'); if(u) sgUse(u.dataset.sguse); });
+  });
   const fl=$('#famLista');
   fl.addEventListener('input',e=>{ if(e.target.id==='famQ'){ FAM.q=e.target.value; renderFam(); } });
   fl.addEventListener('click',e=>{

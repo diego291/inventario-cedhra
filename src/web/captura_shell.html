@@ -82,6 +82,18 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .cgrid .ch:first-child{margin-top:0}
 .cgrid .ch b{background:var(--accent);color:var(--accent-fg);border-radius:6px;padding:1px 7px}
 .cgrid .ch .n{margin-left:auto;white-space:nowrap;font-weight:600;opacity:.8;letter-spacing:0;text-transform:none}
+.sg-in input{width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:15px inherit}.sg-in input:focus{border-color:var(--accent);outline:0}
+.sg-ch{display:flex;gap:6px;overflow-x:auto;padding:8px 0 4px;scrollbar-width:none}.sg-ch button{flex:0 0 auto;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 11px;font:600 12.5px inherit;color:var(--muted);white-space:nowrap;cursor:pointer}
+.sg-ch button.on{background:var(--navy);color:var(--navy-fg);border-color:transparent}.sg-ch button i{font-style:normal;opacity:.75;margin-left:5px}
+.sg-cnt{font-size:12px;color:var(--muted);padding:4px 2px}
+.sg-r{display:flex;gap:10px;align-items:flex-start;padding:9px 4px;border-bottom:1px solid var(--line)}.sg-r.u{opacity:.62}
+.sg-r .t{flex:1;min-width:0}.sg-r .cd{font:600 11.5px "IBM Plex Mono",monospace;color:var(--accent)}.sg-r b{display:block;font-size:13.5px;font-weight:600;margin:1px 0;word-break:break-word}.sg-r small{display:block;color:var(--muted);font-size:11.5px;line-height:1.45}
+.sg-tg{font-size:10.5px;font-weight:700;border-radius:6px;padding:2px 7px;white-space:nowrap;display:inline-block;margin-right:4px}.sg-99{background:rgba(240,160,75,.18);color:var(--accent)}.sg-u{background:var(--bad-bg);color:var(--bad)}
+.sg-bt{flex:0 0 auto;align-self:center;border:1px solid var(--line);background:var(--surface2);color:var(--fg);border-radius:8px;padding:6px 11px;font:600 12.5px inherit;cursor:pointer}
+.sg-fab{position:fixed;right:14px;bottom:84px;z-index:40;border-radius:999px;background:var(--accent);color:var(--accent-fg);border:0;padding:12px 16px;font:700 13.5px inherit;box-shadow:0 4px 18px rgba(0,0,0,.45);cursor:pointer}
+.sg-ov{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center}.sg-ov[hidden]{display:none}
+.sg-sheet{width:100%;max-width:720px;max-height:82vh;background:var(--surface);border-radius:18px 18px 0 0;padding:8px 14px 14px;overflow:auto;box-shadow:0 -10px 40px rgba(0,0,0,.5)}
+.sg-grip{width:44px;height:4px;border-radius:2px;background:var(--line);margin:2px auto 10px}.sg-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:15px}
 .fm{margin:2px 0 10px;border:1px solid var(--line);border-radius:12px;background:var(--surface2);overflow:hidden}
 .fm summary{cursor:pointer;display:flex;align-items:center;gap:8px;padding:9px 12px;font-size:12.5px;color:var(--fg);list-style:none}
 .fm summary::-webkit-details-marker{display:none}
@@ -326,6 +338,7 @@ input.ocr-fill{border-color:var(--ok)!important;box-shadow:0 0 0 2px var(--ok-bg
   <nav class="tabs" role="tablist">
     <button role="tab" data-tab="cap" aria-selected="true">Capturar</button>
     <button role="tab" data-tab="cat" aria-selected="false">Catálogo</button>
+    <button role="tab" data-tab="sg" aria-selected="false">SIGES</button>
     <button role="tab" data-tab="refs" aria-selected="false">Referencias</button>
     <button role="tab" data-tab="ficha" aria-selected="false">Ficha</button>
     <button role="tab" data-tab="equipo" aria-selected="false" id="tabEquipo" hidden>Equipo<span class="tbadge" id="eqBadge" hidden></span></button>
@@ -453,6 +466,13 @@ input.ocr-fill{border-color:var(--ok)!important;box-shadow:0 0 0 2px var(--ok-bg
       <p class="hint">Los dibujos muestran medidas típicas, no el bien real. Confirme midiendo antes de clasificar.</p>
     </div>
   </section>
+
+  <!-- ===== SIGES (buscador del inventario anterior) ===== -->
+  <section class="tab" id="tab-sg" hidden>
+    <div class="card sg-wrap" id="sgTabBox"></div>
+  </section>
+  <button type="button" id="sgFab" class="sg-fab" hidden>🔍 SIGES</button>
+  <div id="sgSheet" class="sg-ov" hidden><div class="sg-sheet"><div class="sg-grip"></div><div class="sg-top"><b>Buscar en SIGES anterior</b><button type="button" class="sg-bt" id="sgClose">Cerrar</button></div><div class="sg-wrap" id="sgSheetBox"></div></div></div>
 
   <!-- ===== REFERENCIAS ===== -->
   <section class="tab" id="tab-refs" hidden>
