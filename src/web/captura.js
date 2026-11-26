@@ -298,7 +298,12 @@ function renderCat(){
   let L=CATL.filter(x=>(!solo||x.img||x.def));
   if(q){ const ws=q.split(' '); L=L.filter(x=>ws.every(w=>x.k.includes(w))); }
   $('#catMeta').textContent=`${L.length} bienes`;
-  $('#catGrid').innerHTML=L.slice(0,200).map(x=>`<button type="button" class="ccard" data-ficha="${x.c}">${x.img?imgTag(x.img,'',500,x.d):'<span class="noimg">Sin dibujo</span>'}<div><span class="mono">${x.c}</span>${esc(x.d)}</div></button>`).join('')||'<div class="empty">Nada coincide.</div>';
+  let h='';
+  porRubro(L.slice(0,200)).forEach(([k,xs])=>{
+    h+=`<div class="ch"><b>${esc(k)}</b><span>${esc(rubNom(xs[0]))}</span><span class="n">${xs.length} bien${xs.length===1?'':'es'}</span></div>`;
+    h+=xs.map(x=>`<button type="button" class="ccard" style="--rc:${rubCol(x.c)}" data-ficha="${x.c}">${x.img?imgTag(x.img,'',500,x.d):'<span class="noimg">Sin dibujo</span>'}<div><span class="mono">${x.c}</span>${esc(x.d)}</div></button>`).join('');
+  });
+  $('#catGrid').innerHTML=h||'<div class="empty">Nada coincide.</div>';
 }
 
 /* ---------- búsqueda del bien ---------- */
@@ -320,17 +325,33 @@ function searchCat(q){
     [...prev.values()].sort((a,b)=>b.n-a.n).slice(0,5).forEach(x=>out.push({free:true,d:x.d,prev:x}));
     if(!prev.has(n)) out.push({free:true,d:q.trim().toUpperCase()});
   }
-  return out;
+  const cat=out.filter(x=>!x.free), libres=out.filter(x=>x.free);
+  return porRubro(cat).reduce((a,g)=>a.concat(g[1]),[]).concat(libres);
 }
+/* rubro = primeros 2 dígitos del bloque; color estable por rubro */
+const rubN=c=>String(c||'').slice(0,2);
+const RUBPAL=['#2F7D4F','#2D5A8C','#B98516','#A3561A','#7A4EA3','#B23A3A','#1F7F86','#5B6578'];
+const rubCol=c=>RUBPAL[(parseInt(rubN(c),10)||0)%RUBPAL.length];
+const rubNom=x=>String((x&&x.r)||'Otros').trim();
+function porRubro(L){ const m=new Map(); L.forEach(x=>{ const k=rubN(x.c); if(!m.has(k)) m.set(k,[]); m.get(k).push(x); }); return [...m.entries()].sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0); }
 let sIdx=-1, sList=[];
 function renderSugg(){
   const ul=$('#lsBien');
   if(!sList.length){ ul.hidden=true; return; }
-  ul.innerHTML=sList.map((x,i)=> x.free
-    ? (x.prev ? `<li role="option" class="free" data-i="${i}" aria-selected="${i===sIdx}"><span class="mono">¿?</span><span>Ya registrado fuera de catálogo: “${esc(x.d)}”<small>${x.prev.n} registro${x.prev.n===1?'':'s'}${x.prev.f?' · '+x.prev.f+' foto'+(x.prev.f===1?'':'s')+' en Referencias':''} · use el mismo nombre</small></span></li>`
-      : `<li role="option" class="free" data-i="${i}" aria-selected="${i===sIdx}"><span class="mono">¿?</span><span>No está en el catálogo: registrar “${esc(x.d)}”<small>Queda marcado para revisión del encargado</small></span></li>`)
-    : `<li role="option" data-i="${i}" aria-selected="${i===sIdx}"><span class="mono">${x.c}</span><span>${esc(x.d)}${x.img?' 🖼':''}<small>${esc(x.why||x.r)}</small></span></li>`).join('');
-  ul.hidden=false;
+  let h='', last='';
+  sList.forEach((x,i)=>{
+    if(x.free){
+      h+= x.prev ? `<li role="option" class="free" data-i="${i}" aria-selected="${i===sIdx}"><span class="mono">¿?</span><span>Ya registrado fuera de catálogo: “${esc(x.d)}”<small>${x.prev.n} registro${x.prev.n===1?'':'s'}${x.prev.f?' · '+x.prev.f+' foto'+(x.prev.f===1?'':'s')+' en Referencias':''} · use el mismo nombre</small></span></li>`
+        : `<li role="option" class="free" data-i="${i}" aria-selected="${i===sIdx}"><span class="mono">¿?</span><span>No está en el catálogo: registrar “${esc(x.d)}”<small>Queda marcado para revisión del encargado</small></span></li>`;
+      return;
+    }
+    const k=rubN(x.c);
+    if(k!==last){ last=k; const n=sList.filter(y=>!y.free&&rubN(y.c)===k).length; h+=`<li class="gh" role="presentation"><b>${esc(k)}</b><span>${esc(rubNom(x))}</span><span class="n">${n} familia${n===1?'':'s'}</span></li>`; }
+    const sg=INVBLK.get(x.c)||0;
+    h+=`<li role="option" class="it" style="--rc:${rubCol(x.c)}" data-i="${i}" aria-selected="${i===sIdx}"><span class="mono">${x.c}</span><span>${esc(x.d)}${x.img?' 🖼':''}<small>${esc(x.why||('Familia '+x.c+' · '+sg+' en SIGES'))}</small></span></li>`;
+  });
+  ul.innerHTML=h; ul.hidden=false;
+  const a=ul.querySelector('li[aria-selected="true"]'); if(a&&a.scrollIntoView) a.scrollIntoView({block:'nearest'});
 }
 function choose(x){
   chosen = x ? (x.free ? {c:'',d:x.d,free:true} : {...CAT.get(x.c)||x}) : null;
@@ -1073,7 +1094,7 @@ function wire(){
     else if(e.key==='Escape'){ sList=[]; renderSugg(); }
   };
   ib.onblur=()=>setTimeout(()=>{ sList=[]; renderSugg(); },180);
-  $('#lsBien').onmousedown=e=>{ const li=e.target.closest('li'); if(!li) return; e.preventDefault(); pick(sList[+li.dataset.i]); };
+  $('#lsBien').onmousedown=e=>{ const li=e.target.closest('li'); if(!li||li.dataset.i===undefined) return; e.preventDefault(); pick(sList[+li.dataset.i]); };
   $('#goCat').onclick=()=>showTab('cat');
   $('#inEtq').oninput=e=>{ fmtEtq(e.target); updEtq(); }; $('#inSerie').oninput=()=>{ ocrLimpiar('#inSerie'); updSerie(); }; $('#inMarca').addEventListener('input',()=>ocrLimpiar('#inMarca')); $('#inModelo').addEventListener('input',()=>ocrLimpiar('#inModelo'));
   $$('.pm button').forEach(b=>b.onclick=()=>{ const i=$('#q'+b.dataset.k); i.value=Math.max(0,(parseInt(i.value)||0)+(+b.dataset.d)); updQty(); });
