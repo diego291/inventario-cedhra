@@ -29,7 +29,7 @@ function toast(m, actLabel, act){
   $('#toast').hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>$('#toast').hidden=true, actLabel?7000:2600);
 }
 
-let REF=null; const CAT=new Map(), CATL=[], INV=new Map(), SER=new Map(), INVBYUB=new Map(), INVBLK=new Map();
+let REF=null; const CAT=new Map(), CATL=[], INV=new Map(), SER=new Map(), INVBYUB=new Map(), INVBLK=new Map(), INVLIST=new Map();
 let LOCS=[], STATE={}, VER=null, online=navigator.onLine!==false, busy=0, REVS=[];
 const ROWS=new Map(); let SINCE=0, FULLVER=null, LOCVER=null, syncing=false, OUTBOX=[], REJ=[];
 let editingId=null, chosen=null, formFotos=[], uploads=0;
@@ -87,7 +87,7 @@ async function addLoc(){
 
 /* ---------- datos ---------- */
 function loadRef(R){
-  REF=R; CAT.clear(); CATL.length=0; INV.clear(); SER.clear(); INVBYUB.clear(); INVBYUB.clear(); INVBLK.clear();
+  REF=R; CAT.clear(); CATL.length=0; INV.clear(); SER.clear(); INVBYUB.clear(); INVBYUB.clear(); INVBLK.clear(); INVLIST.clear();
   $('#catGrid').innerHTML='';
   REF.cat.forEach(([c,d,r,img,def,ras,noc,reg,med,pre,ale])=>{ const x={c,d,r,img,def,ras,noc,reg,med,pre,ale}; CAT.set(c,x); CATL.push({...x,k:norm(c+' '+d+' '+r)}); });
   const serCount=new Map();
@@ -95,10 +95,12 @@ function loadRef(R){
     const rec={code,desc,marca,modelo,serie,fecha,ub,valor,extra:!!extra,blk:(code.split('-')[1]||'')};
     INV.set(norm(code),rec);
     INVBLK.set(rec.blk,(INVBLK.get(rec.blk)||0)+1);
+    if(!INVLIST.has(rec.blk)) INVLIST.set(rec.blk,[]); INVLIST.get(rec.blk).push(rec);
     if(serie){ const k=norm(serie); serCount.set(k,(serCount.get(k)||0)+1); SER.set(k,rec); }
     const u=norm(ub); if(!INVBYUB.has(u)) INVBYUB.set(u,[]); INVBYUB.get(u).push(rec);
   });
   serCount.forEach((n,k)=>{ if(n>1) SER.set(k,'DUP'); });
+  INVLIST.forEach(l=>l.sort((a,b)=>a.code<b.code?-1:a.code>b.code?1:0));
   $('#hdrInst').textContent = (REF.periodo||'Conteo físico') + ' · ' + (REF.nombre||'');
   if(R.me) setMe(R.me);
   $('#selInst').innerHTML = REF.insts.map((c,i)=>`<option value="${i?esc(c):''}">${esc(c)}${i?'':' (principal)'}</option>`).join('');
@@ -357,6 +359,7 @@ function choose(x){
   chosen = x ? (x.free ? {c:'',d:x.d,free:true} : {...CAT.get(x.c)||x}) : null;
   $('#inBien').value=''; sList=[]; renderSugg();
   $('#bienWrap').hidden=!!chosen;
+  renderFam();
   const ch=$('#bienChosen');
   if(chosen){
     const u=curUbic(), antHere=(INVBYUB.get(norm(u))||[]).filter(r=>r.blk===chosen.c).length;
@@ -549,13 +552,52 @@ function oldRecHtml(r, u){
   return `<dl class="oldrec"><dt>Código</dt><dd class="mono">${esc(r.code)}</dd><dt>Bien</dt><dd>${esc(r.desc)}</dd>${(r.marca||r.modelo)?`<dt>Marca</dt><dd>${esc([r.marca,r.modelo].filter(Boolean).join(' · '))}</dd>`:''}${r.serie?`<dt>Serie</dt><dd class="mono">${esc(r.serie)}</dd>`:''}${r.fecha?`<dt>Adquirido</dt><dd>${esc(r.fecha)}</dd>`:''}${r.valor!=null?`<dt>Valor</dt><dd>${money(r.valor)}</dd>`:''}${r.ub?`<dt>Ubicación ant.</dt><dd>${esc(r.ub)}${moved?' · <b>estaba en otra ubicación</b>':''}</dd>`:''}</dl>`;
 }
 function dupEtq(e, exceptId){ const n=norm(e); if(!n) return []; return [...new Set(allRows().filter(r=>r.id!==exceptId&&norm(r.etq)===n).map(r=>r.ubic))]; }
+/* ---------- lista de la familia bajo "Etiqueta que tiene" ---------- */
+const FAM={blk:'',q:'',f:'todos'};
+function famUsados(){
+  const m=new Map();
+  allRows().forEach(r=>{ if(r.id===editingId) return; const e=String(r.etq||'').trim().toUpperCase(), g=e.match(/^(\d{5})-(\d{4})-(\d{4})$/); if(!g) return;
+    const n=Math.max(1,qty(r)||1); for(let k=0;k<n;k++) m.set(g[1]+'-'+g[2]+'-'+String(+g[3]+k).padStart(4,'0'),r.ubic||''); });
+  return m;
+}
+function famHl(t,ws){ let h=esc(t||''); if(!h) return '—'; ws.forEach(w=>{ if(w.length<2) return; h=h.replace(new RegExp('('+w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','ig'),'<mark>$1</mark>'); }); return h; }
+function famBlk(){
+  const e=norm($('#inEtq').value), g=e.match(/^\d{5}-(\d{4})/);
+  if(chosen&&chosen.c&&INVLIST.has(chosen.c)) return chosen.c;
+  return g&&INVLIST.has(g[1])?g[1]:'';
+}
+function renderFam(){
+  const box=$('#famLista'); if(!box) return;
+  const blk=famBlk();
+  if(!blk){ box.hidden=true; box.innerHTML=''; FAM.blk=''; return; }
+  const all=INVLIST.get(blk), cat=CAT.get(blk);
+  if(FAM.blk!==blk||!box.firstChild){
+    FAM.blk=blk; FAM.q=''; FAM.f='todos';
+    box.innerHTML=`<details open><summary><b>Familia ${esc(blk)}${cat?' · '+esc(cat.d):''}</b><span class="fm-n" id="famN"></span></summary><div class="fm-fs"><input type="search" id="famQ" placeholder="Filtrar por marca, modelo o serie" autocomplete="off"><span class="fm-cnt" id="famCnt"></span></div><div class="fm-fc" id="famChips"></div><div class="fm-body" id="famBody"></div></details>`;
+  }
+  box.hidden=false;
+  const used=famUsados(), e=norm($('#inEtq').value), pg=e.match(/^\d{5}-(\d{4})-(\d{1,3})$/), pref=(pg&&pg[1]===blk)?e:'';
+  const ws=norm(FAM.q).split(' ').filter(Boolean);
+  const nUsed=all.filter(r=>used.has(r.code)).length;
+  let L=all.filter(r=>{ const u=used.has(r.code); if(FAM.f==='libres'&&u) return false; if(FAM.f==='usados'&&!u) return false;
+    if(pref&&!norm(r.code).startsWith(pref)) return false;
+    const k=norm([r.code,r.desc,r.marca,r.modelo,r.serie,r.ub].join(' ')); return ws.every(w=>k.includes(w)); });
+  const tot=L.length, MAXF=60; L=L.slice(0,MAXF);
+  $('#famN').textContent=`${all.length} en SIGES · ${nUsed} usados`;
+  $('#famCnt').textContent=(FAM.q||pref||FAM.f!=='todos')?`${tot} de ${all.length}`:'';
+  $('#famChips').innerHTML=[['todos','Todos',all.length],['libres','Libres',all.length-nUsed],['usados','Usados',nUsed]].map(([k,t,n])=>`<button type="button" data-f="${k}" class="${FAM.f===k?'on':''}">${t} ${n}</button>`).join('');
+  $('#famBody').innerHTML=L.length?L.map(r=>{ const u=used.has(r.code), sel=norm(r.code)===e;
+    return `<div class="fm-r${u?' u':''}${sel?' sel':''}"><span class="fm-c">${esc(r.code.slice(-4))}</span><span class="fm-t"><b>${famHl(((r.marca||'')+' '+(r.modelo||'')).trim()||r.desc,ws)}</b><small>S/N ${famHl(r.serie,ws)} · ${esc(r.ub||'—')}${r.valor?' · $'+esc(r.valor):''}${r.fecha?' · '+esc(String(r.fecha).slice(0,4)):''}</small></span>${sel?'<span class="fm-tag ok">Elegido</span>':(u?`<span class="fm-tag">Usado · ${esc(used.get(r.code)||'—')}</span>`:`<button type="button" class="btn sm fm-use" data-code="${esc(r.code)}">Usar</button>`)}</div>`; }).join('')+(tot>MAXF?`<div class="fm-more">Mostrando ${MAXF} de ${tot}: escriba en el filtro para acotar.</div>`:'')
+    : '<div class="fm-more">Nada coincide con ese filtro.</div>';
+}
 function updEtq(){
   const e=$('#inEtq').value, box=$('#etqStatus');
   const v=etqVerdict(e, chosen&&chosen.c);
-  if(!v){ box.hidden=true; updQty(); return; }
+  if(!v){ box.hidden=true; renderFam(); updQty(); return; }
   const d=dupEtq(e, editingId);
   box.className='status '+v.cls; box.hidden=false;
   box.innerHTML=`<span>${esc(v.txt)}</span>${v.rec?oldRecHtml(v.rec,curUbic())+'<div><button type="button" class="btn sm" id="copyOld">Copiar marca, modelo y serie</button></div>':''}${d.length?`<b>⚠ Esta etiqueta ya se registró en: ${esc(d.join(', '))}.</b>`:''}`;
+  renderFam();
   if(v.rec) $('#copyOld').onclick=()=>{ $('#inMarca').value=v.rec.marca||''; $('#inModelo').value=v.rec.modelo||''; $('#inSerie').value=v.rec.serie||''; $('#more').open=true; updSerie(); toast('Datos copiados del inventario anterior'); };
   updQty();
 }
@@ -1096,6 +1138,12 @@ function wire(){
   ib.onblur=()=>setTimeout(()=>{ sList=[]; renderSugg(); },180);
   $('#lsBien').onmousedown=e=>{ const li=e.target.closest('li'); if(!li||li.dataset.i===undefined) return; e.preventDefault(); pick(sList[+li.dataset.i]); };
   $('#goCat').onclick=()=>showTab('cat');
+  const fl=$('#famLista');
+  fl.addEventListener('input',e=>{ if(e.target.id==='famQ'){ FAM.q=e.target.value; renderFam(); } });
+  fl.addEventListener('click',e=>{
+    const c=e.target.closest('[data-f]'); if(c){ FAM.f=c.dataset.f; renderFam(); return; }
+    const u=e.target.closest('.fm-use'); if(u){ $('#inEtq').value=u.dataset.code; updEtq(); updSerie(); const b=$('#copyOld'); toast('Etiqueta '+u.dataset.code+' puesta'+(b?' · toque "Copiar marca, modelo y serie" si coincide':'')); }
+  });
   $('#inEtq').oninput=e=>{ fmtEtq(e.target); updEtq(); }; $('#inSerie').oninput=()=>{ ocrLimpiar('#inSerie'); updSerie(); }; $('#inMarca').addEventListener('input',()=>ocrLimpiar('#inMarca')); $('#inModelo').addEventListener('input',()=>ocrLimpiar('#inModelo'));
   $$('.pm button').forEach(b=>b.onclick=()=>{ const i=$('#q'+b.dataset.k); i.value=Math.max(0,(parseInt(i.value)||0)+(+b.dataset.d)); updQty(); });
   ['#qb','#qr','#qm'].forEach(s=>{ const i=$(s); i.oninput=updQty; i.onfocus=()=>setTimeout(()=>i.select(),0); i.onblur=()=>{ i.value=Math.max(0,parseInt(i.value)||0); updQty(); }; });
